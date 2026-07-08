@@ -1,0 +1,19 @@
+{
+  "last_session": null,
+  "current_iteration": null,
+  "current_requirement_input": null,
+  "current_skill": null,
+  "current_step": null,
+  "status": "idle",
+  "documents": {
+    "requirement_design": null,
+    "ui_design": null,
+    "development_plan": null,
+    "review_status": null,
+    "test_report": null
+  },
+  "current_task": null,
+  "blocked_items": [],
+  "milestones": [],
+  "iteration_history": []
+}

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Optional auto-push hook. Rename to post-commit only when the project wants automatic push after commit.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(dirname "$0")/auto-push.ps1"
+exit 0

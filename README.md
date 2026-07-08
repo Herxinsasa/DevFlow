@@ -1,0 +1,163 @@
+﻿# DevFlow - AI 原生迭代开发工作流
+
+DevFlow 是一套可复制到项目中的 Claude Code 开发工作流。目标是让 AI 面向日常迭代稳定完成开发：不偏离需求、不遗漏影响面、不过度开发，并能在中断后继续执行。
+
+核心用法：
+
+```text
+复制 .claude 到目标项目根目录
+打开 Claude Code
+Claude 会先恢复状态，并主动询问是否开始或继续需求开发
+```
+
+完整调度规则在 `.claude/CLAUDE.md`，本文档面向人类快速理解。
+
+---
+
+## 一句话定位
+
+```text
+按需求项分析，按需求输入协调；用需求设计文档想清楚，用开发计划逐任务执行，用独立子 Agent 控制编码和审查上下文。
+```
+
+DevFlow 解决的是 AI 开发的三个核心问题：
+
+- **不偏离需求**：每个任务绑定需求项、验收标准、设计依据和审查结果。
+- **不遗漏影响**：编码前先做影响面分析，涉及 UI 时必须有界面契约。
+- **不过度开发**：任务只允许改计划内范围，低置信度和未决问题不能进入编码。
+
+第一版不引入进化系统，不做自动规则升级，优先保证流程轻量、可执行、可恢复。
+
+---
+
+## 核心对象
+
+| 对象 | 说明 |
+|------|------|
+| 需求输入 | 用户的一份需求文档、Issue、截图说明、口头需求或一次迭代输入 |
+| 迭代需求文档 | `spec-analyzer` 输出的结构化需求分析结果 |
+| 需求项 | 最小分析、设计、开发、验收单位，可独立追踪 |
+| 需求设计文档 | `design-writer` 输出的详细设计，按一次需求输入成文，内部包含多个需求项 |
+| 界面设计文档 | `ui-designer` 输出的 UI 稿解析、界面契约和前端实现设计 |
+| 编码上下文 | 需求设计文档中的编码边界章节，不单独落盘 |
+| 开发计划 | `dev-planner` 输出的任务序列和状态记录，支持中断后继续 |
+| 审查状态 | `.claude/.review-status.json`，由 `code-review` 写入，供 stop hook 和提交前检查使用 |
+
+---
+
+## 主流程
+
+```mermaid
+flowchart TB
+    START(["需求输入"]) --> SPEC["spec-analyzer<br/>需求分析"]
+    SPEC --> IMPACT["impact-analyzer<br/>影响面分析"]
+    IMPACT --> UI{"涉及 UI?"}
+    UI -->|"是"| UID["ui-designer<br/>界面设计文档"]
+    UI -->|"否"| DESIGN
+    UID --> DESIGN["design-writer<br/>需求设计文档"]
+    IMPACT --> DESIGN
+    DESIGN --> PLAN["dev-planner<br/>开发计划"]
+    PLAN --> BUILD["dev-builder<br/>独立 implementer 编码"]
+    BUILD --> REVIEW["code-review<br/>独立 code-reviewer 审查"]
+    REVIEW --> TEST["code-tester<br/>测试验证"]
+    TEST --> BUG{"失败?"}
+    BUG -->|"是"| FIX["bug-fixer<br/>证据-复现-根因-修复"]
+    FIX --> TEST
+    BUG -->|"否"| COMMIT["code-committer<br/>用户触发提交"]
+    COMMIT --> DONE(["完成"])
+```
+
+---
+
+## 复杂度等级
+
+| 中文等级 | 内部等级 | 典型条件 | 流程深度 |
+|----------|----------|----------|----------|
+| 微 | XS | 极小、零歧义、不改接口/数据/行为链路 | 可跳过详细设计，由 `dev-builder` 临时组装编码输入 |
+| 小 | S | 单模块轻量变更，有少量交互或流程需约束 | 轻量影响面 + 必要设计 + 开发计划 |
+| 中 | M | 多模块、可能涉及接口/数据/UI 状态 | 完整影响面 + 需求设计文档 + 开发计划 |
+| 大 | L | 跨模块/跨工程/协议/数据模型/不可回滚变更 | 完整设计 + 风险确认 + 加深测试和审查 |
+
+聚合风险不改变单个需求项级别，但会影响开发计划、测试范围和审查重点。
+
+---
+
+## 中断恢复
+
+DevFlow 支持中断后继续，但依赖文件化状态。
+
+新 AI 窗口恢复时应读取：
+
+1. `.claude/progress.json`：当前迭代、当前 Skill、当前步骤、关键里程碑。
+2. `docs/design/计划/<需求迭代编号>-<需求主题>开发计划.md`：任务状态和执行记录。
+3. `docs/design/需求/<需求迭代编号>-<需求主题>需求.md`：需求设计和编码上下文。
+4. `docs/design/ui/<需求迭代编号>-<需求主题>界面设计.md`：界面契约，如涉及 UI。
+5. `.claude/.review-status.json`：最近一次审查范围和结论。
+6. 测试报告或当前会话测试结论。
+
+如果 `progress.json` 为空，新窗口应扫描 `docs/design/计划` 找最近开发计划，以任务状态为准恢复。
+
+开发计划中的任务状态是恢复核心：
+
+```text
+待执行 / 执行中 / 已完成 / 阻塞 / 跳过
+```
+
+---
+
+## 调度与恢复原则
+
+DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继续计划，已有开发计划就按任务状态继续，代码已变更则优先审查和测试。
+
+如果中途打开新 AI 窗口，先读取 `.claude/progress.json`；若索引为空，则扫描 `docs/design/计划`，以开发计划中的任务状态恢复。
+
+执行中任务优先：除非用户明确要求停止或切换，否则先完成当前编码、审查或测试任务，避免半成品和状态错乱。
+
+项目加载完成后，如果用户没有给出明确任务，DevFlow 应主动询问是否开始新需求、继续上次迭代，或切换到需求分析、详细设计、开发、审查、测试、提交等阶段。
+
+---
+
+## Skill 与 Agent
+
+| 阶段 | Skill / Agent |
+|------|---------------|
+| 需求分析 | `spec-analyzer` |
+| 影响面分析 | `impact-analyzer` |
+| UI 稿解析与前端设计 | `ui-designer` |
+| 详细设计 | `design-writer` |
+| 开发计划 | `dev-planner` |
+| 编码调度 | `dev-builder` |
+| 编码执行 | `agents/implementer.md` |
+| 代码审查 | `code-review` |
+| 审查执行 | `agents/code-reviewer.md` |
+| 测试验证 | `code-tester` |
+| Bug 修复 | `bug-fixer` |
+| 提交收尾 | `code-committer` |
+
+---
+
+## Hooks
+
+`.claude/settings.local.json` 默认注册 Claude Code `Stop` hook：
+
+- `stop-gate.ps1`：停止前检查是否存在未审查代码变更。
+
+Git hooks 需要目标项目手动启用：
+
+```powershell
+git config core.hooksPath .claude/hooks
+```
+
+启用后：
+
+- `pre-commit` 调用 `pre-commit-check.ps1`，提交前编译检查，失败会阻止提交并路由到 `bug-fixer`。
+- `post-commit.sample` 是自动 push 样例，不默认启用。
+
+---
+
+## 即插即用约定
+
+DevFlow 只要求复制 `.claude` 目录。目标项目的需求、设计、计划、测试报告会在该项目自己的 `docs/design/...` 下生成。
+
+本仓库不保留样例 `docs`，避免复制时污染目标项目。
+

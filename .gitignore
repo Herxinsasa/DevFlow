@@ -1,0 +1,16 @@
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# DevFlow runtime (generated at target project)
+.claude/worktrees/
+.claude/.review-status.json
+
+# Temp
+*.tmp
+*.log
