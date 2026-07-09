@@ -82,13 +82,19 @@ description: 提交辅助。用户明确要求提交、commit、发布或生成 
 
 ### Step 4：编译/构建检查
 
-提交前必须确保 Git pre-commit 检查默认开启：
+提交前必须确保 Git pre-commit 检查已启用。先读取当前仓库配置：
+
+```powershell
+git config --get core.hooksPath
+```
+
+如果输出不是 `.claude/hooks`，由 `code-committer` 自动设置：
 
 ```powershell
 git config core.hooksPath .claude/hooks
 ```
 
-如果当前仓库未设置 `core.hooksPath=.claude/hooks`，先设置后再继续提交。该设置只影响当前仓库，不写入提交。
+该设置只影响当前仓库，不写入提交。
 
 根据项目类型执行编译或构建检查：
 
