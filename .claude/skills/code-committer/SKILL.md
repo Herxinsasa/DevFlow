@@ -1,9 +1,9 @@
 ---
 name: code-committer
-description: 提交收尾。用户明确要求提交、commit、发布或生成 changelog 时触发；提交前检查开发计划状态、code-review 状态、code-tester 测试结果和编译结果。编译失败路由到 bug-fixer，不自动提交。
+description: 提交辅助。用户明确要求提交、commit、发布或生成 changelog 时触发；提交前检查开发计划状态、code-review 状态、code-tester 测试结果和编译结果。编译失败路由到 bug-fixer，不自动提交。
 ---
 
-# Code Committer - 提交收尾
+# Code Committer - 提交辅助
 
 ## 定位
 
@@ -81,6 +81,14 @@ description: 提交收尾。用户明确要求提交、commit、发布或生成 
 测试失败或待复现时不提交，按测试报告路由。
 
 ### Step 4：编译/构建检查
+
+提交前必须确保 Git pre-commit 检查默认开启：
+
+```powershell
+git config core.hooksPath .claude/hooks
+```
+
+如果当前仓库未设置 `core.hooksPath=.claude/hooks`，先设置后再继续提交。该设置只影响当前仓库，不写入提交。
 
 根据项目类型执行编译或构建检查：
 
@@ -160,7 +168,7 @@ commit message：
 
 用户确认后执行 `git add` 和 `git commit`。
 
-推送不默认执行。用户明确要求 push 或项目配置启用自动 push 时才推送。
+推送不默认执行。只有用户明确要求 push 时才推送。
 
 ---
 
@@ -169,10 +177,9 @@ commit message：
 | Hook | 时机 | 与本 Skill 的关系 |
 |------|------|------------------|
 | Stop / `stop-gate.ps1` | Claude Code 停止前 | 防止未审查代码被遗留 |
-| Git pre-commit / `pre-commit-check.ps1` | git commit 前 | 兜底编译检查；失败应阻止提交 |
-| Git post-commit / `auto-push.ps1` | git commit 后 | 可选自动推送，首版不默认启用 |
+| Git pre-commit / `pre-commit-check.ps1` | git commit 前 | 默认开启的编译检查；失败应阻止提交 |
 
-`code-committer` 是主动提交流程；hooks 是兜底保护。不要只依赖 hooks。
+`code-committer` 是主动提交流程；hooks 是兜底保护。不要只依赖 hooks。DevFlow 不使用 post-commit 自动推送。
 
 ---
 

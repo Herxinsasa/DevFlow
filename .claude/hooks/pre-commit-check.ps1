@@ -2,12 +2,8 @@
 .SYNOPSIS
   Git pre-commit build check.
 .DESCRIPTION
-  git commit 前自动运行编译检查。编译失败时阻止提交。
-  编译失败属于可复现缺陷，应回到 bug-fixer：收集日志、分析根因、最小修复、重新验证。
-
-  启用方式：
-  - 方案 A：git config core.hooksPath .claude/hooks，并提供 pre-commit 包装脚本
-  - 方案 B：手动在 .git/hooks/pre-commit 中调用本脚本
+  Runs a best-effort build check before git commit.
+  Build failures block the commit and should be routed to bug-fixer.
 #>
 
 $ErrorActionPreference = "Continue"
@@ -26,51 +22,51 @@ $buildCommand = ""
 
 if ($hasXmake) {
   $buildCommand = "xmake build"
-  Write-Host "[pre-commit] xmake 项目，运行编译检查..."
+  Write-Host "[pre-commit] xmake project detected; running build check..."
   & xmake build 2>&1 | Out-Host
   if ($LASTEXITCODE -ne 0) { $buildFailed = $true }
 } elseif ($hasCmake) {
   $buildCommand = "cmake --build build"
-  Write-Host "[pre-commit] CMake 项目，运行编译检查..."
+  Write-Host "[pre-commit] CMake project detected; running build check..."
   & cmake --build build 2>&1 | Out-Host
   if ($LASTEXITCODE -ne 0) { $buildFailed = $true }
 } elseif ($hasPackageJson) {
   $buildCommand = "npm run build"
-  Write-Host "[pre-commit] Node.js 项目，运行编译检查..."
+  Write-Host "[pre-commit] Node.js project detected; running build check..."
   if (Test-Path "$rootDir\node_modules") {
     & npm --prefix "$rootDir" run build 2>&1 | Out-Host
     if ($LASTEXITCODE -ne 0) { $buildFailed = $true }
   } else {
-    Write-Host "[pre-commit] 未找到 node_modules，跳过 npm build。"
+    Write-Host "[pre-commit] node_modules not found; skipping npm build."
   }
 } elseif ($hasCargoToml) {
   $buildCommand = "cargo build"
-  Write-Host "[pre-commit] Rust 项目，运行编译检查..."
+  Write-Host "[pre-commit] Rust project detected; running build check..."
   & cargo build --manifest-path "$rootDir\Cargo.toml" 2>&1 | Out-Host
   if ($LASTEXITCODE -ne 0) { $buildFailed = $true }
 } elseif ($hasGoMod) {
   $buildCommand = "go build ./..."
-  Write-Host "[pre-commit] Go 项目，运行编译检查..."
+  Write-Host "[pre-commit] Go project detected; running build check..."
   & go build ./... 2>&1 | Out-Host
   if ($LASTEXITCODE -ne 0) { $buildFailed = $true }
 } elseif ($hasCsproj) {
   $buildCommand = "dotnet build"
-  Write-Host "[pre-commit] .NET 项目，运行编译检查..."
+  Write-Host "[pre-commit] .NET project detected; running build check..."
   & dotnet build "$rootDir" 2>&1 | Out-Host
   if ($LASTEXITCODE -ne 0) { $buildFailed = $true }
 } elseif ($hasPyProject) {
   $buildCommand = "python -m compileall"
-  Write-Host "[pre-commit] Python 项目，运行语法检查..."
+  Write-Host "[pre-commit] Python project detected; running syntax check..."
   & python -m compileall "$rootDir" -q 2>&1 | Out-Host
   if ($LASTEXITCODE -ne 0) { $buildFailed = $true }
 } else {
-  Write-Host "[pre-commit] 未检测到已知项目类型，跳过编译检查。"
+  Write-Host "[pre-commit] No known project type detected; skipping build check."
 }
 
 if ($buildFailed) {
-  Write-Host "[pre-commit] 编译检查未通过，阻止提交。"
-  Write-Host "[pre-commit] 失败命令：$buildCommand"
-  Write-Host "[pre-commit] 请进入 bug-fixer：收集错误日志，建立复现，分析根因，最小修复后重新提交。"
+  Write-Host "[pre-commit] Build check failed; blocking commit."
+  Write-Host "[pre-commit] Failed command: $buildCommand"
+  Write-Host "[pre-commit] Route to bug-fixer: collect logs, reproduce, find root cause, apply minimal fix, then retry commit."
   exit 1
 }
 

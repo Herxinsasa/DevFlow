@@ -6,6 +6,8 @@
   "current_step": null,
   "status": "idle",
   "documents": {
+    "requirement_spec": null,
+    "impact_analysis": null,
     "requirement_design": null,
     "ui_design": null,
     "development_plan": null,
