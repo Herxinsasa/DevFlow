@@ -1,4 +1,13 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git config *)",
+      "Bash(gh auth *)",
+      "Bash(unset GITHUB_TOKEN)",
+      "Bash(git push *)",
+      "Bash(powershell.exe *)"
+    ]
+  },
   "hooks": {
     "Stop": [
       {
