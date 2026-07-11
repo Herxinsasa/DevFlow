@@ -71,7 +71,8 @@ description: 提交辅助。用户明确要求提交、commit、发布或生成 
 
 - 没有审查状态。
 - 审查范围是 partial 且未覆盖本次提交文件。
-- 审查后又出现新的代码变更。
+- 审查状态缺少 `reviewed_file_hashes`。
+- 本次暂存代码不在审查范围，或文件内容与审查快照不一致。
 - 结论为“不通过”。
 
 ### Step 3：检查测试结果
@@ -182,10 +183,10 @@ commit message：
 
 | Hook | 时机 | 与本 Skill 的关系 |
 |------|------|------------------|
-| Stop / `stop-gate.ps1` | Claude Code 停止前 | 防止未审查代码被遗留 |
-| Git pre-commit / `pre-commit-check.ps1` | git commit 前 | 默认开启的编译检查；失败应阻止提交 |
+| Git pre-commit / `review-check.ps1` | git commit 前 | 校验暂存代码均已审查且内容未在审查后变化 |
+| Git pre-commit / `pre-commit-check.ps1` | git commit 前 | 执行编译检查；失败阻止提交并路由 `bug-fixer` |
 
-`code-committer` 是主动提交流程；hooks 是兜底保护。不要只依赖 hooks。DevFlow 不使用 post-commit 自动推送。
+`code-committer` 是主动提交流程；Git hooks 是提交前兜底保护。Claude 正常停止输出不代表编码完成，因此不使用 Stop hook 作为业务门禁。DevFlow 不使用 post-commit 自动推送。
 
 ---
 
@@ -205,6 +206,7 @@ commit message：
 □ 是否用户明确要求提交？
 □ 开发计划是否允许提交？
 □ code-review 是否通过或有条件通过？
+□ 本次代码是否与 code-review 记录的文件哈希一致？
 □ code-tester 是否通过？
 □ 编译是否通过？
 □ 编译失败是否路由到 bug-fixer？

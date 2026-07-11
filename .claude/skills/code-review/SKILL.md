@@ -11,7 +11,7 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 
 `dev-builder` 关注“当前任务是否按计划完成”；`code-review` 关注“本次代码变更整体是否安全、完整、不过度，是否会破坏既有行为”。
 
-未经审查的代码不得提交。审查通过后写入 `.claude/.review-status.json`，供后续提交流程或 stop-gate 读取。
+未经审查的代码不得提交。审查通过后写入 `.claude/.review-status.json`，由 `code-committer` 和 Git `pre-commit` 校验。
 
 ---
 
@@ -42,6 +42,7 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 | 界面设计文档 | 涉及 UI 时确认界面契约、前端实现设计和 UI 验收方式 |
 | `dev-builder` 执行记录 | 确认任务级执行结果、修改摘要、验证结果 |
 | 变更文件列表 / diff | 审查实际代码变更 |
+| 开发计划代码基线 | 排除迭代开始前已有的用户改动，确定本次审查边界 |
 | 编码规范和现有代码事实 | 审查代码风格、错误处理、测试、日志和架构边界 |
 
 没有 UI 影响时，不需要界面设计文档。
@@ -61,6 +62,8 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 | 指定文件审查 | 用户指定文件或目录 |
 
 默认选择迭代级审查。若只审查部分任务，必须在报告中说明未覆盖范围。
+
+审查范围以开发计划的基线提交、迭代开始时已有变更、任务目标文件和 `dev-builder` 执行记录共同确定。不得把无法证明属于本次迭代的已有改动自动纳入审查结论。
 
 ### Step 2：组装审查输入
 
@@ -123,6 +126,14 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 .claude/.review-status.json
 ```
 
+先对本次已审查代码文件生成内容快照：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/review-check.ps1 -Snapshot -Files <已审查代码文件列表>
+```
+
+把输出的 `reviewed_files`、`reviewed_file_hashes` 和 `diff_fingerprint` 原样写入审查状态。内容哈希用于判断文件是否在审查后再次修改，不使用固定时间窗口代替代码版本校验。
+
 建议结构：
 
 ```json
@@ -133,6 +144,11 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
   "reviewed_tasks": ["TASK-001"],
   "reviewed_requirements": ["REQ-001"],
   "reviewed_files": ["文件列表"],
+  "reviewed_file_hashes": {
+    "src/example.cpp": "<git blob hash>"
+  },
+  "diff_fingerprint": "<快照指纹>",
+  "review_scope": "full",
   "ui_contract_checked": true,
   "conclusion": "通过",
   "accepted_risks": [],
@@ -193,4 +209,5 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 □ Critical / Important 是否没有被放行？
 □ 有条件通过是否记录了接受原因？
 □ 审查通过后是否写入 .review-status.json？
+□ 审查状态是否包含当前已审查代码的文件哈希和 diff 指纹？
 ```

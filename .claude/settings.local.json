@@ -7,18 +7,5 @@
       "Bash(git push *)",
       "Bash(powershell.exe *)"
     ]
-  },
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-gate.ps1\""
-          }
-        ]
-      }
-    ]
   }
 }

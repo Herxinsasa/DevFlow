@@ -1,4 +1,4 @@
-﻿# DevFlow - AI 原生迭代开发工作流
+# DevFlow - AI 原生迭代开发工作流
 
 DevFlow 是一套可复制到项目中的 Claude Code 开发工作流。目标是让 AI 面向日常迭代稳定完成开发：不偏离需求、不遗漏影响面、不过度开发，并能在中断后继续执行。
 
@@ -41,7 +41,7 @@ DevFlow 解决的是 AI 开发的三个核心问题：
 | 界面设计文档 | `ui-designer` 输出的 UI 稿解析、界面契约和前端实现设计 |
 | 编码上下文 | 需求设计文档中的编码边界章节，不单独落盘 |
 | 开发计划 | `dev-planner` 输出的任务序列和状态记录，支持中断后继续 |
-| 审查状态 | `.claude/.review-status.json`，由 `code-review` 写入，供 stop hook 和提交前检查使用 |
+| 审查状态 | `.claude/.review-status.json`，由 `code-review` 写入，记录结论、覆盖范围和代码内容哈希，供提交前检查使用 |
 
 ---
 
@@ -57,8 +57,9 @@ flowchart TB
     UI -->|"是"| UID["ui-designer<br/>界面设计文档"]
     UI -->|"否"| DESIGN
     UID --> DESIGN["design-writer<br/>需求设计文档"]
-    IMPACT --> DESIGN
-    DESIGN --> PLAN["dev-planner<br/>开发计划"]
+    DESIGN --> DCONF{"设计已确认或无需确认?"}
+    DCONF -->|"否"| DESIGN
+    DCONF -->|"是"| PLAN["dev-planner<br/>开发计划"]
     PLAN --> BUILD["dev-builder<br/>独立 implementer 编码"]
     BUILD --> REVIEW["code-review<br/>独立 code-reviewer 审查"]
     REVIEW --> TEST["code-tester<br/>测试验证"]
@@ -81,6 +82,8 @@ flowchart TB
 | 大 | L | 跨模块/跨工程/协议/数据模型/不可回滚变更 | 完整设计 + 风险确认 + 加深测试和审查 |
 
 聚合风险不改变单个需求项级别，但会影响开发计划、测试范围和审查重点。
+
+需求实际涉及线程、并发、缓存、资源生命周期或性能时，需求设计必须形成明确运行时约束；不涉及时只标记“不涉及”。中/大需求以及涉及关键运行时、兼容、迁移、UI 或不可逆决策的小需求，在生成开发计划前需要用户确认设计。
 
 ---
 
@@ -113,6 +116,8 @@ DevFlow 支持中断后继续，但依赖文件化状态。
 DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继续计划，已有开发计划就按任务状态继续，代码已变更则优先审查和测试。
 
 需求规格未确认，或存在会影响方向、范围、验收的待确认问题时，不进入影响面分析。
+
+开发计划记录基线提交和迭代开始时已有变更；无法证明属于当前需求的用户原有改动，不自动纳入任务、审查或提交范围。
 
 如果中途打开新 AI 窗口，先读取 `.claude/progress.json`；若索引为空，则扫描 `docs/08-计划`，以开发计划中的任务状态恢复。
 
@@ -160,9 +165,7 @@ DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继
 
 ## Hooks
 
-`.claude/settings.local.json` 默认注册 Claude Code `Stop` hook：
-
-- `stop-gate.ps1`：停止前检查是否存在未审查代码变更。
+Claude Code 的 `Stop` 表示当前回复结束，不代表编码完成。DevFlow 不使用 Stop hook 作为审查门禁，避免阻断需求确认、阶段汇报和等待用户输入。
 
 Git hooks 在 DevFlow 初始化时启用。AI 加载项目或执行 `code-committer` 时，应检查当前仓库配置；若未设置，则自动执行：
 
@@ -172,7 +175,8 @@ git config core.hooksPath .claude/hooks
 
 启用后：
 
-- `pre-commit` 调用 `pre-commit-check.ps1`，提交前编译检查，失败会阻止提交并路由到 `bug-fixer`。
+- `pre-commit` 先调用 `review-check.ps1`，校验暂存代码均已审查且内容未在审查后变化。
+- `pre-commit` 再调用 `pre-commit-check.ps1`，执行编译检查；失败会阻止提交并路由到 `bug-fixer`。
 - DevFlow 不提供 post-commit 自动 push。推送只由用户明确要求时通过 `code-committer` 执行。
 
 ---
