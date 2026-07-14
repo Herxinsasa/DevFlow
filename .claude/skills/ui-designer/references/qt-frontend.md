@@ -1,29 +1,16 @@
-# Qt 前端实现设计参考
+# Qt 界面契约参考
 
-首版只关注能指导编码的必要差异，不建立完整 Qt UI 设计体系。
+仅用于解释 Qt UI 稿和补齐桌面界面约束，不输出 C++、Widgets 或 QML 技术实现设计。
 
-## 识别线索
+| 维度 | Qt Widgets / Qt QML 需要确认 |
+|------|------------------------------|
+| 界面载体 | 主窗口、对话框、页签、Widget、Page、Dialog 或 Popup |
+| 入口 | 菜单、按钮、快捷入口、配置页或流程步骤 |
+| 控件与字段 | 标签、单位、格式、默认展示、只读/启用条件 |
+| 交互 | 点击、输入、选择、保存、取消、联动和反馈 |
+| 状态 | 本需求涉及的加载、空、错误、禁用和成功状态 |
+| 桌面适配 | 最小窗口尺寸、缩放、滚动、溢出和不同分辨率 |
+| 视觉 | 复用的控件、QSS/主题外观、间距、图标和资源 |
+| 验收 | 对应窗口、操作步骤、状态变化和稿件对比 |
 
-- Qt Widgets：`QWidget`、`QDialog`、`QMainWindow`、`QTableView`、`.ui`、QSS、信号槽。
-- Qt QML：`.qml`、Qt Quick、`property`、`Signal`、`Component`、`Loader`。
-- 桌面客户端、工具软件、工控界面。
-
-## 实现设计要点
-
-| 项 | Qt Widgets | Qt QML |
-|----|------------|--------|
-| 页面载体 | QMainWindow、QDialog、QWidget、tab page | QML Page、Component、Dialog、Popup |
-| 组件拆分 | 复用现有 QWidget/Dialog，明确是否改 `.ui` | 复用现有 QML Component，明确 property 和 signal |
-| 状态管理 | model/view、成员变量、信号槽 | property、binding、model、signal handler |
-| 数据映射 | UI 控件到配置项、DTO、业务对象 | QML property 到 C++/JS model 或接口字段 |
-| 样式策略 | 复用 QSS、资源文件、控件样式 | 复用主题变量、qml 样式组件、资源 |
-| 交互事件 | signal/slot、event filter、button clicked | onClicked、onChanged、signal handler |
-| 线程约束 | UI 更新必须回到主线程 | UI property 更新注意线程边界 |
-| 验证方式 | 手工桌面验收、Qt Test、截图对比 | 手工验收、QML Test、截图对比 |
-
-## 边界
-
-- 不为单个需求重构窗口框架或主导航。
-- 不擅自改变现有 `.ui` 文件结构、对象名和信号槽连接方式。
-- 不在 UI 线程执行耗时逻辑。
-- UI 稿未覆盖桌面分辨率时，至少说明最小窗口尺寸、滚动和溢出策略。
+边界：不描述类名、信号槽实现、property 绑定、线程方案、数据映射和通信实现。

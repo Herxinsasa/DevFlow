@@ -72,6 +72,7 @@ description: 提交辅助。用户明确要求提交、commit、发布或生成 
 - 没有审查状态。
 - 审查范围是 partial 且未覆盖本次提交文件。
 - 审查状态缺少 `reviewed_file_hashes`。
+- 审查状态缺少 `review_agent_name=code-reviewer` 或 `review_agent_id`。
 - 本次暂存代码不在审查范围，或文件内容与审查快照不一致。
 - 结论为“不通过”。
 

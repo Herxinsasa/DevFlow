@@ -5,7 +5,9 @@
       "Bash(gh auth *)",
       "Bash(unset GITHUB_TOKEN)",
       "Bash(git push *)",
-      "Bash(powershell.exe *)"
+      "Bash(powershell.exe *)",
+      "Agent(implementer)",
+      "Agent(code-reviewer)"
     ]
   }
 }
