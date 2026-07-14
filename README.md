@@ -6,7 +6,7 @@ DevFlow 是一套可复制到项目中的 Claude Code 开发工作流。目标�
 
 ```text
 复制 .claude 到目标项目根目录
-打开 Claude Code
+关闭已打开的 Claude Code 会话并重新打开项目，使自定义 Agent 生效
 Claude 会先恢复状态，并主动询问是否开始或继续需求开发
 ```
 
@@ -38,7 +38,7 @@ DevFlow 解决的是 AI 开发的三个核心问题：
 | 迭代需求文档 | `spec-analyzer` 输出的结构化需求分析结果 |
 | 需求项 | 最小分析、设计、开发、验收单位，可独立追踪 |
 | 需求设计文档 | `design-writer` 输出的详细设计，按一次需求输入成文，内部包含多个需求项 |
-| 界面设计文档 | `ui-designer` 输出的 UI 稿解析、界面契约和前端实现设计 |
+| 界面设计文档 | `ui-designer` 输出的 UI 稿解析、界面契约和 UI 验收依据，不包含前端技术实现设计 |
 | 编码上下文 | 需求设计文档中的编码边界章节，不单独落盘 |
 | 开发计划 | `dev-planner` 输出的任务序列和状态记录，支持中断后继续 |
 | 审查状态 | `.claude/.review-status.json`，由 `code-review` 写入，记录结论、覆盖范围和代码内容哈希，供提交前检查使用 |
@@ -52,14 +52,14 @@ flowchart TB
     START(["需求输入"]) --> SPEC["spec-analyzer<br/>需求分析"]
     SPEC --> CONFIRM{"需求规格已确认?"}
     CONFIRM -->|"否"| SPEC
-    CONFIRM -->|"是"| IMPACT["impact-analyzer<br/>影响面分析"]
+    CONFIRM -->|"是"| IMPACT["impact-analyzer<br/>端到端影响面闭合"]
     IMPACT --> UI{"涉及 UI?"}
     UI -->|"是"| UID["ui-designer<br/>界面设计文档"]
     UI -->|"否"| DESIGN
     UID --> DESIGN["design-writer<br/>需求设计文档"]
-    DESIGN --> DCONF{"设计已确认或无需确认?"}
+    DESIGN --> DCONF{"设计已确认且编码相关 TBD 为 0<br/>或无需确认?"}
     DCONF -->|"否"| DESIGN
-    DCONF -->|"是"| PLAN["dev-planner<br/>开发计划"]
+    DCONF -->|"是"| PLAN["dev-planner<br/>编码任务 + 验证清单"]
     PLAN --> BUILD["dev-builder<br/>独立 implementer 编码"]
     BUILD --> REVIEW["code-review<br/>独立 code-reviewer 审查"]
     REVIEW --> TEST["code-tester<br/>测试验证"]
@@ -115,7 +115,9 @@ DevFlow 支持中断后继续，但依赖文件化状态。
 
 DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继续计划，已有开发计划就按任务状态继续，代码已变更则优先审查和测试。
 
-需求规格未确认，或存在会影响方向、范围、验收的待确认问题时，不进入影响面分析。
+需求规格未确认，或存在会影响方向、范围、验收的待确认问题时，不进入影响面分析。影响链路未闭合、界面契约未确认或需求设计仍有编码相关 TBD 时，也不得进入后续计划和编码。
+
+影响面分析按项目真实技术闭合入口、客户端/前端状态、请求构造、通信边界、接收处理、持久化/缓存、响应映射和展示结果，不预设 REST 或 RPC。新增/修改字段必须验证两侧映射和转换链路；同名对象按完整路径、真实符号、职责和可修改性消歧。
 
 开发计划记录基线提交和迭代开始时已有变更；无法证明属于当前需求的用户原有改动，不自动纳入任务、审查或提交范围。
 
@@ -144,22 +146,27 @@ DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继
 
 ---
 
-## Skill 与 Agent
+## Skills
 
-| 阶段 | Skill / Agent |
-|------|---------------|
-| 需求分析 | `spec-analyzer` |
-| 影响面分析 | `impact-analyzer` |
-| UI 稿解析与前端设计 | `ui-designer` |
-| 详细设计 | `design-writer` |
-| 开发计划 | `dev-planner` |
-| 编码调度 | `dev-builder` |
-| 编码执行 | `agents/implementer.md` |
-| 代码审查 | `code-review` |
-| 审查执行 | `agents/code-reviewer.md` |
-| 测试验证 | `code-tester` |
-| Bug 修复 | `bug-fixer` |
-| 提交辅助 | `code-committer` |
+| 阶段 | Skill | 职责 |
+|------|-------|------|
+| 需求分析 | `spec-analyzer` | 整理需求项、验收标准和待确认问题 |
+| 影响面分析 | `impact-analyzer` | 验证端到端影响链路和流程深度 |
+| UI 设计 | `ui-designer` | 解析 UI 稿并形成界面契约 |
+| 详细设计 | `design-writer` | 编写统一的需求技术设计 |
+| 开发计划 | `dev-planner` | 生成编码任务、验证清单和状态 |
+| 编码调度 | `dev-builder` | 组装任务上下文并调用编码子 Agent |
+| 代码审查 | `code-review` | 组装审查上下文并调用审查子 Agent |
+| 测试验证 | `code-tester` | 执行验证清单并记录证据 |
+| Bug 修复 | `bug-fixer` | 按复现、根因、修复、复测闭环处理失败 |
+| 提交辅助 | `code-committer` | 执行提交前检查、提交和按需推送 |
+
+## 子 Agent
+
+| 子 Agent | 调用方 | 职责 |
+|-----------|--------|------|
+| `implementer` | `dev-builder` | 在独立上下文中执行单个编码任务 |
+| `code-reviewer` | `code-review` | 在独立上下文中审查实际代码变更 |
 
 ---
 
@@ -175,9 +182,11 @@ git config core.hooksPath .claude/hooks
 
 启用后：
 
-- `pre-commit` 先调用 `review-check.ps1`，校验暂存代码均已审查且内容未在审查后变化。
+- `pre-commit` 先调用 `review-check.ps1`，校验独立 `code-reviewer` 执行标识、暂存代码审查覆盖和审查后内容变化。
 - `pre-commit` 再调用 `pre-commit-check.ps1`，执行编译检查；失败会阻止提交并路由到 `bug-fixer`。
 - DevFlow 不提供 post-commit 自动 push。推送只由用户明确要求时通过 `code-committer` 执行。
+
+`implementer` 和 `code-reviewer` 是 `.claude/agents/` 中的独立子 Agent。复制或更新 `.claude` 后必须重启 Claude Code；如果 Agent 不可用，流程会阻塞，不允许主 Agent inline 代替编码或审查。
 
 ---
 
@@ -187,3 +196,4 @@ DevFlow 只要求复制 `.claude` 目录。目标项目的需求、设计、计�
 
 本仓库不保留样例 `docs`，避免复制时污染目标项目。
 
+从旧版升级时，删除目标项目中遗留的 Stop hook 配置和 `.claude/hooks/stop-gate.ps1`，再重启 Claude Code，并确认 `core.hooksPath` 为 `.claude/hooks`。详细变更见 `releaseNote.txt`。

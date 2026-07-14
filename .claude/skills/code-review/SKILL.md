@@ -39,7 +39,7 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 |------|------|
 | 开发计划 | 确认任务、状态、验收标准和执行记录 |
 | 需求设计文档 | 确认需求项、编码上下文、契约设计和验证计划 |
-| 界面设计文档 | 涉及 UI 时确认界面契约、前端实现设计和 UI 验收方式 |
+| 界面设计文档 | 涉及 UI 时确认界面契约和 UI 验收方式；前端技术设计从需求设计读取 |
 | `dev-builder` 执行记录 | 确认任务级执行结果、修改摘要、验证结果 |
 | 变更文件列表 / diff | 审查实际代码变更 |
 | 开发计划代码基线 | 排除迭代开始前已有的用户改动，确定本次审查边界 |
@@ -50,6 +50,10 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 ---
 
 ## 工作流程
+
+### Step 0：检查 code-reviewer 可用性
+
+确认 Agent 工具能够发现并调用 `.claude/agents/code-reviewer.md`。如果不可用，返回 `BLOCKED_AGENT_UNAVAILABLE`，不得由主 Agent 模拟独立审查，也不得写入通过状态。复制或修改 Agent 文件后需重启 Claude Code 才能在新会话中发现。
 
 ### Step 1：确定审查范围
 
@@ -84,6 +88,8 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 ### Step 3：派独立 code-reviewer
 
 使用 Agent 工具创建新的 `code-reviewer` Agent。
+
+必须记录实际执行的 `agent_name=code-reviewer` 和 `agent_id`；无法取得 ID 时记录工具返回的等价执行标识。
 
 审查重点：
 
@@ -120,7 +126,7 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 
 ### Step 5：写入审查状态
 
-审查“通过”或“有条件通过”后，写入：
+只有独立 `code-reviewer` 实际执行且结论为“通过”或“有条件通过”后，才能写入：
 
 ```text
 .claude/.review-status.json
@@ -139,6 +145,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/review-che
 ```json
 {
   "last_review": "<时间戳>",
+  "review_agent_name": "code-reviewer",
+  "review_agent_id": "<Agent 执行标识>",
   "iteration": "<需求迭代编号>",
   "development_plan": "<开发计划路径>",
   "reviewed_tasks": ["TASK-001"],
@@ -202,6 +210,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/review-che
 
 ```text
 □ 是否使用独立 code-reviewer Agent？
+□ code-reviewer 不可用时是否阻止主 Agent 模拟审查和写入通过状态？
+□ 审查状态是否记录 review_agent_name 和 review_agent_id？
 □ 是否说明审查范围？
 □ 是否覆盖开发计划、需求设计文档和实际 diff？
 □ 涉及 UI 时是否检查界面契约？
