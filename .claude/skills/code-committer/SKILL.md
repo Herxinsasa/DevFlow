@@ -166,6 +166,12 @@ commit message：
 - review/test/build passed
 ```
 
+commit message 要点约束：
+
+- 每条要点不超过 20 个字，简短精炼。
+- 动词开头，写清做了什么，不展开背景与细节。
+- 详细说明放 changelog，commit message 只保留精炼要点。
+
 ### Step 7：用户确认后提交
 
 展示：
@@ -213,5 +219,6 @@ commit message：
 □ 编译失败是否路由到 bug-fixer？
 □ 是否检查误提交文件？
 □ 是否经用户确认后提交？
+□ commit message 要点是否不超过 20 字、简短精炼？
 □ 是否没有默认 push？
 ```
