@@ -166,6 +166,29 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/review-che
 
 如果是部分审查，必须记录 `review_scope: "partial"` 和未覆盖任务。
 
+### Step 6：生成提交信息草稿（通过/有条件通过时）
+
+审查结论为“通过”或“有条件通过”时，按 `code-committer` 的提交信息模板附带生成一份 commit message 草稿，供用户直接使用：
+
+```text
+<需求迭代编号>: <需求主题>
+
+新增:
+- ...
+修改:
+- ...
+修复:
+- ...
+验证:
+- review/test/build passed
+```
+
+要求：
+
+- 草稿按本次审查覆盖的需求项和任务汇总新增/修改/修复。
+- 此步骤只生成草稿，不执行提交；提交仍须用户明确要求并走 `code-committer`。
+- 审查通过后代码可能再经 `code-tester`/`bug-fixer` 变动，`code-committer` 提交前刷新最终版。
+
 ---
 
 ## 输出
@@ -202,6 +225,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/review-che
 | | | |
 ```
 
+审查结论为“通过”或“有条件通过”时，随报告附带按 `code-committer` 模板生成的 commit message 草稿（不执行提交）。
+
 ---
 
 ## 自审查
@@ -220,4 +245,5 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/review-che
 □ 有条件通过是否记录了接受原因？
 □ 审查通过后是否写入 .review-status.json？
 □ 审查状态是否包含当前已审查代码的文件哈希和 diff 指纹？
+□ 通过/有条件通过时是否附带 commit message 草稿，且未执行提交？
 ```
