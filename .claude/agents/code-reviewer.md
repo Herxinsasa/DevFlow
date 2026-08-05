@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: 代码审查 Sub-Agent。每次审查独立实例，不继承编码上下文。基于开发计划、需求设计文档、界面契约、编码规范和实际 diff 审查代码变更，输出中文结构化结论。
+description: 代码审查子 Agent。每次审查独立实例，不继承编码上下文。基于开发计划、需求设计文档、界面契约、编码规范和实际 diff 审查代码变更，输出中文结构化结论。
 ---
 
 # Code Reviewer - 代码审查
