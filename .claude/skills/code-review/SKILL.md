@@ -81,6 +81,7 @@ description: 代码审查。调度独立 code-reviewer Agent，对 dev-builder �
 □ 界面设计文档路径和界面契约（如涉及 UI）
 □ dev-builder 执行记录和任务级审查结果
 □ 编码规范或项目现有代码风格说明
+□ 项目代码约定（编码（字符集 + BOM）与行尾、风格要点、代表性样例文件路径）
 ```
 
 不要把无关历史讨论塞给 reviewer，避免污染判断。

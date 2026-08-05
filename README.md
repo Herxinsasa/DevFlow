@@ -6,9 +6,11 @@ DevFlow 是一套可复制到项目中的 Claude Code 开发工作流。目标�
 
 ```text
 复制 .claude 到目标项目根目录
-关闭已打开的 Claude Code 会话并重新打开项目，使自定义 Agent 生效
+关闭已打开的 Claude Code 会话并重新打开项目，使自定义 Skill 和子 Agent 生效
 Claude 会先恢复状态，并主动询问是否开始或继续需求开发
 ```
+
+Claude Code 会自动加载根目录 `CLAUDE.md` 与 `.claude/CLAUDE.md`，复制后重启即可生效。
 
 完整调度规则在 `.claude/CLAUDE.md`，本文档面向人类快速理解。
 
@@ -136,6 +138,7 @@ DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继
 | 需求规格 | `docs/02-需求/<需求迭代编号>-<需求主题>需求.md` |
 | 影响面分析 | `docs/02-需求/<需求迭代编号>-<需求主题>影响面.md` |
 | 需求设计 | `docs/04-设计/需求设计/<需求迭代编号>-<需求主题>需求设计.md` |
+| 接口契约 | `docs/04-设计/接口契约/<需求迭代编号>-<需求主题>接口契约.md`（仅分离开发） |
 | 模块设计 | `docs/04-设计/模块设计/<模块名>.md` |
 | 架构设计 | `docs/01-总览/架构总览.md` |
 | UI 设计 | `docs/05-UI/<需求迭代编号>-<需求主题>界面设计.md` |
@@ -146,6 +149,20 @@ DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继
 
 ---
 
+## 编码规范基线
+
+DevFlow 自带默认规范基线 `.claude/constraints/`：
+
+| 规范 | 文件 | 用途 |
+|------|------|------|
+| 通用编码约束 | `.claude/constraints/coding-req.md` | 命名、编码格式、错误处理、格式化等 |
+| 日志规范 | `.claude/constraints/log-req.md` | 日志约束 |
+| 目录规范 | `.claude/constraints/directory-spec.md` | 产物目录组织参考 |
+
+规范来源优先级（高 → 低）：用户本次指定 > 项目自定义规范 > DevFlow 基线。
+
+`dev-builder` 编码前从现有代码提取项目代码约定（编码（字符集 + BOM）与行尾、代码风格），随编码输入强制注入；项目约定优先于基线。用户可直接改写 `.claude/constraints/`，整体替换为自有规范。
+
 ## Skills
 
 | 阶段 | Skill | 职责 |
@@ -153,10 +170,10 @@ DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继
 | 需求分析 | `spec-analyzer` | 整理需求项、验收标准和待确认问题 |
 | 影响面分析 | `impact-analyzer` | 验证端到端影响链路和流程深度 |
 | UI 设计 | `ui-designer` | 解析 UI 稿并形成界面契约 |
-| 详细设计 | `design-writer` | 编写统一的需求技术设计 |
+| 详细设计 | `design-writer` | 编写统一的需求技术设计；分离开发时产出接口契约并过确认门 |
 | 开发计划 | `dev-planner` | 生成编码任务、验证清单和状态 |
-| 编码调度 | `dev-builder` | 组装任务上下文并调用编码子 Agent |
-| 代码审查 | `code-review` | 组装审查上下文并调用审查子 Agent |
+| 编码调度 | `dev-builder` | 提取项目代码约定，组装任务上下文并调用编码子 Agent |
+| 代码审查 | `code-review` | 组装审查上下文并调用审查子 Agent；通过后附提交草稿 |
 | 测试验证 | `code-tester` | 执行验证清单并记录证据 |
 | Bug 修复 | `bug-fixer` | 按复现、根因、修复、复测闭环处理失败 |
 | 提交辅助 | `code-committer` | 执行提交前检查、提交和按需推送 |
@@ -165,7 +182,7 @@ DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继
 
 | 子 Agent | 调用方 | 职责 |
 |-----------|--------|------|
-| `implementer` | `dev-builder` | 在独立上下文中执行单个编码任务 |
+| `implementer` | `dev-builder` | 在独立上下文中执行单个编码任务，遵循项目编码事实 |
 | `code-reviewer` | `code-review` | 在独立上下文中审查实际代码变更 |
 
 ---
