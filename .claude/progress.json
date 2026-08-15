@@ -1,5 +1,6 @@
 {
-  "last_session": null,
+  "schema_version": "1.1",
+  "updated_at": null,
   "current_iteration": null,
   "current_requirement_input": null,
   "current_skill": null,
@@ -16,6 +17,7 @@
   },
   "current_task": null,
   "blocked_items": [],
-  "milestones": [],
+  "milestones": {},
+  "pending_inputs": [],
   "iteration_history": []
 }

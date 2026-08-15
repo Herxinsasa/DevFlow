@@ -10,7 +10,11 @@ Desktop.ini
 # DevFlow runtime (generated at target project)
 .claude/worktrees/
 .claude/.review-status.json
+.claude/.build-status.json
+.devflow-backups/
 
 # Temp
 *.tmp
 *.log
+__pycache__/
+*.py[cod]

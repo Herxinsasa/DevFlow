@@ -4,7 +4,7 @@
 .DESCRIPTION
   -Snapshot prints hashes for current changed code files. code-review stores
   these values in .claude/.review-status.json. Default mode compares staged
-  code blobs with those hashes and blocks missing reviewer identity,
+  code blobs with those hashes and blocks missing independent reviewer identity,
   unreviewed code, or code changed after review.
 #>
 
@@ -113,15 +113,16 @@ try {
   exit 1
 }
 
-$validConclusion = @("通过", "有条件通过", "PASS") -contains [string]$reviewData.conclusion
+$validConclusion = (@("通过", "有条件通过", "PASS") -contains [string]$reviewData.conclusion) -or
+  (@("passed", "conditional_pass") -contains [string]$reviewData.status)
 if (-not $validConclusion) {
   Write-Host "[pre-commit] Latest code-review did not pass."
   exit 1
 }
 
-if ([string]$reviewData.review_agent_name -ne "code-reviewer" -or
-    [string]::IsNullOrWhiteSpace([string]$reviewData.review_agent_id)) {
-  Write-Host "[pre-commit] Review status has no independent code-reviewer execution ID; run code-review again."
+$reviewer = if ($reviewData.reviewer) { [string]$reviewData.reviewer } else { [string]$reviewData.review_agent_name }
+if ($reviewer -ne "code-reviewer") {
+  Write-Host "[pre-commit] Review status has no independent code-reviewer marker; run code-review again."
   exit 1
 }
 

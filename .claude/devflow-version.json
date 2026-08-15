@@ -1,0 +1,113 @@
+{
+  "version": "1.1.0",
+  "progress_schema_version": "1.1",
+  "managed_files": {
+    ".claude/.gitignore": "43cdb16fcfd05c24857de4371071b46e2a1ccee83c96246ccb71e83f705bd106",
+    ".claude/agents/code-reviewer.md": "2fac79fded6915308bf7713e66c94936a215d3740c0bcf3d436457d8852f0241",
+    ".claude/agents/implementer.md": "cf2eeef585f289e758d44ae4ee8e85c74cb4900bacdc01e0ad1e745e2ca8ff60",
+    ".claude/CLAUDE.md": "b811ad5c749182f4d33a24f14fe6c68afb11a7640ce32666caa9f2633fdca935",
+    ".claude/constraints/coding-req.md": "06370b652cb2a5126768c998c6e9386c5a66f588b440fe5d30e63ff7592b8dcc",
+    ".claude/constraints/directory-spec.md": "0555d407691303a0c7d58fc9edfcc0e4cdb9401e63b7d3375e404dc34bc08eed",
+    ".claude/constraints/log-req.md": "b791fde1452de0c0c5da4f805e23787d4c06bd6e7393bf4c1a494d33dee488c6",
+    ".claude/hooks/build-credential.py": "5fd9f996c3cf542dc0230c24e7309ac2ccbe693da57cfae5ee3b1df63353fe6d",
+    ".claude/hooks/pre-commit": "1319bdec422eaec7be317f3672753079dfa7e664bb9d40ae2fec8960710bf476",
+    ".claude/hooks/pre-commit-check.ps1": "bb5e431465d295f5935ad919cca914aaaa95707f5a1f28e8b4043941bab56ea7",
+    ".claude/hooks/review-check.ps1": "14533a2c91f6ec369b6ec10dc8dde6001aa17dad111ceb23b78beab7d2d51101",
+    ".claude/skills/bug-fixer/SKILL.md": "5002d4222201c1ed4a0e91c55b4dd87b4db9f16cedb29f7a0c61e22e7d763a34",
+    ".claude/skills/code-committer/SKILL.md": "fa1370b0dd3da08b99c5ed2e5daa9754c67a79639f04b2aaef7b9848c0361158",
+    ".claude/skills/code-review/SKILL.md": "5b77036521a37637d016aa4afbb96eacdf626e727073b3e310a761a58371cc06",
+    ".claude/skills/code-tester/SKILL.md": "e6c50c0644b2cb33713e34e1ce6ea32ea85fb856b593bb698462991839e15f81",
+    ".claude/skills/design-maker/SKILL.md": "bda89c90bf3242c341080a226cd8ad9e581b217f126f52b044b6b5705c65088a",
+    ".claude/skills/design-writer/references/模块设计_模板.md": "36b58176b93647117258d587fdf5f9e3b29d19faecf2b46f1b43a9434922c803",
+    ".claude/skills/design-writer/references/软件架构_模板.md": "03369688055f82f27d3f46fa16dece17af901b633fe893c100dae99962b890ee",
+    ".claude/skills/design-writer/references/需求设计_模板.md": "17852eba2218d98d8784b3f613f95fbbe58d1d2b14193ff51d357896f0d14b85",
+    ".claude/skills/design-writer/SKILL.md": "149546cbda496ea50fc407ba1cc7a74456004e7c13b2fe5f02b882408508512e",
+    ".claude/skills/dev-builder/SKILL.md": "e6dc714defad67337ba4d1bce6514626c94dfadae8cb2565fdf1494c3894a8ea",
+    ".claude/skills/dev-planner/SKILL.md": "a53598865c4acb45655e9d50e8b4aad17dc1bc9585ce180801cd7c27a212b723",
+    ".claude/skills/impact-analyzer/SKILL.md": "4d4c19827c4be9589bc88bf82ab57b401d6aa296f2880c275534955578252a08",
+    ".claude/skills/spec-analyzer/references/需求规格_模板.md": "0fb03492747c7f3327d59eaa56ea2502dfc9bccc4a08eb47c854693b64230f85",
+    ".claude/skills/spec-analyzer/SKILL.md": "ff34c0bdcd2fd6b2a0feec465adafa1147d48fa8400fde6b4b706fe58c4b8147"
+  },
+  "deprecated_files": [
+    ".claude/skills/ui-designer/SKILL.md",
+    ".claude/skills/ui-designer/references/qt-frontend.md",
+    ".claude/skills/ui-designer/references/web-frontend.md"
+  ],
+  "legacy_hashes": {
+    ".claude/CLAUDE.md": [
+      "0d4d4c7f53b623c9894889fb2572ef3739bb5d3f04e4f8771eab6128cfa89936"
+    ],
+    ".claude/agents/code-reviewer.md": [
+      "e73d93ef304ca76e6ad09fc1a1ceb1c977403f69dd1bb8a94953c5220fa222fe"
+    ],
+    ".claude/agents/implementer.md": [
+      "b3b2f6ecd2b327544d8ea2a49d694a5e8edaac98c89f505fc9f0da1a96536fbf"
+    ],
+    ".claude/constraints/coding-req.md": [
+      "83df2f9ad948c709738af540e846a21ac7ea5ce12d163d0c3d3d11b1605c6853"
+    ],
+    ".claude/constraints/directory-spec.md": [
+      "93ac7098c506686126c7e0cc7c6e8c58c4cf187feced1219b165a7c2c20b39b4"
+    ],
+    ".claude/constraints/log-req.md": [
+      "145e6bcbb43396611963e9872477d09ebeb4b7889bb29aaf1868d34374cbd4f7"
+    ],
+    ".claude/hooks/pre-commit": [
+      "1319bdec422eaec7be317f3672753079dfa7e664bb9d40ae2fec8960710bf476"
+    ],
+    ".claude/hooks/pre-commit-check.ps1": [
+      "5650c4eb7c80f6482d076850e40eef0a250339bbfbabbab8a3c98b2547c5f80e"
+    ],
+    ".claude/hooks/review-check.ps1": [
+      "5d8ec5c7d83f37119be8fa5a49d074746adad2983d0930a5bcff49c078d9801e"
+    ],
+    ".claude/skills/bug-fixer/SKILL.md": [
+      "79a0fd2748256bd62bc66217139ea4c40a56a61b3d64e7907243697385a384df"
+    ],
+    ".claude/skills/code-committer/SKILL.md": [
+      "77a8e94f92e690f6f774ee6f9059cd0e3ceead990b46a565adfa2dba82977c66"
+    ],
+    ".claude/skills/code-review/SKILL.md": [
+      "1f24e843a7e9ca88333af40966b8aa6be43847e6c0d087e22ba0ce257ad90a68"
+    ],
+    ".claude/skills/code-tester/SKILL.md": [
+      "883671bdc768de02598f6d9930331d3d3730c4fddf35489bd51cc5c03039bde3"
+    ],
+    ".claude/skills/design-writer/SKILL.md": [
+      "b6fbef1146f9866dd391d8595640b5ef1860214fc5b0ea2a8c1c4e1c5c81d85b"
+    ],
+    ".claude/skills/design-writer/references/模块设计_模板.md": [
+      "18022142d4e1c1c329c628a71ff1eb568de0c8f939a186caeab544d62c027654"
+    ],
+    ".claude/skills/design-writer/references/软件架构_模板.md": [
+      "13965311bba50a54f14f41fc90fc27b389bb1cff4a4d00ac85e253ce2fc3e189"
+    ],
+    ".claude/skills/design-writer/references/需求设计_模板.md": [
+      "95810ed22a895bcd786184f8173833d96e6024874481f3490aaf86103c718ec9"
+    ],
+    ".claude/skills/dev-builder/SKILL.md": [
+      "0d04dbcd3725d4b1dc1083624ebfefd946a67d7fdddc21692c02d04d7ec30d0f"
+    ],
+    ".claude/skills/dev-planner/SKILL.md": [
+      "37d50eee818a488dc61dc361570a95701196407c182d6e512fd17b3a0072bfcf"
+    ],
+    ".claude/skills/impact-analyzer/SKILL.md": [
+      "adf655654dabbb39f187c3947a870c2f2e2f9e1b13e1426d1a6caf29c0fa983a"
+    ],
+    ".claude/skills/spec-analyzer/SKILL.md": [
+      "807923d3244d53c91f4ed43b1018132a07c44608f211b0e214b6dcce5aa50b0e"
+    ],
+    ".claude/skills/spec-analyzer/references/需求规格_模板.md": [
+      "d3aa9d95d408593cd4a8be2a46e05eb66b7f01023bcc596e81a87f02d7582a08"
+    ],
+    ".claude/skills/ui-designer/SKILL.md": [
+      "1d6e32efdab9491def5a86243f257166fc1074d0da8344ebeebbc3fe20404d7c"
+    ],
+    ".claude/skills/ui-designer/references/qt-frontend.md": [
+      "a40966dbebd5c8621cb2aa784f213f19f52dca5858cda1a9e8ea33d8260bf8b8"
+    ],
+    ".claude/skills/ui-designer/references/web-frontend.md": [
+      "f023e11c04e9b7d0daf027b35a5020d0d93f3e57e13046c01d201d9e2fffed4d"
+    ]
+  }
+}

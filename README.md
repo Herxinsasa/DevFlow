@@ -1,218 +1,130 @@
-# DevFlow - AI 原生迭代开发工作流
+# DevFlow 1.1
 
-DevFlow 是一套可复制到项目中的 Claude Code 开发工作流。目标是让 AI 面向日常迭代稳定完成开发：不偏离需求、不遗漏影响面、不过度开发，并能在中断后继续执行。
+DevFlow 是一套安装到 Git 项目中的 AI 迭代开发工作流，用于约束 AI 完成需求澄清、影响面分析、设计、编码、审查和验证，并支持任务中断后恢复。
 
-核心用法：
+## 工作流特点
 
-```text
-复制 .claude 到目标项目根目录
-关闭已打开的 Claude Code 会话并重新打开项目，使自定义 Skill 和子 Agent 生效
-Claude 会先恢复状态，并主动询问是否开始或继续需求开发
-```
+- **质量优先**：开发前确认需求和影响范围，开发后执行独立审查与验证，减少理解偏差和遗漏。
+- **轻重适配**：按 T0-T3 调整流程深度，小改动保持轻量，复杂需求补足影响面和详细设计。
+- **尊重项目事实**：优先使用项目文档、现有架构和源码证据，不让 AI 自行推断业务与模块边界。
+- **可持续执行**：任务、阻塞和验证状态文件化，跨会话或中途切换后可以继续推进。
+- **人工控制关键方向**：需要业务判断的阶段由用户确认，编码、审查和测试尽量自动完成。
+- **保护现有项目**：保留用户已有修改和项目定制，升级、审查及提交均有明确保护边界。
 
-Claude Code 会自动加载根目录 `CLAUDE.md` 与 `.claude/CLAUDE.md`，复制后重启即可生效。
+## 适用场景
 
-完整调度规则在 `.claude/CLAUDE.md`，本文档面向人类快速理解。
+适合使用 Git、由 AI 参与日常迭代的 C/C++、Qt、Web、服务端或混合技术栈项目，尤其适合：
 
----
+- 需求涉及多个模块、接口、数据、UI 或持久化。
+- 开发任务可能跨会话执行或中途切换。
+- 希望前三轮关键文档由人确认，后续开发尽量自动推进。
+- 需要保留独立代码审查、人工验收和提交门禁。
 
-## 一句话定位
+以下工作不会启动需求迭代：
 
-```text
-按需求项分析，按需求输入协调；用需求设计文档想清楚，用开发计划逐任务执行，用独立子 Agent 控制编码和审查上下文。
-```
+- 代码解释、方案讨论、只读排查、文档评审和状态查询。
+- 不改变既有预期的普通 Bug 修复。
+- 纯格式、注释或不改变产品行为的短时维护。
 
-DevFlow 解决的是 AI 开发的三个核心问题：
+DevFlow 不替代项目管理平台、产品决策和人工验收。一次性脚本、纯探索原型或无须留存状态的极短任务通常无需使用。
 
-- **不偏离需求**：每个任务绑定需求项、验收标准、设计依据和审查结果。
-- **不遗漏影响**：编码前先做影响面分析，涉及 UI 时必须有界面契约。
-- **不过度开发**：任务只允许改计划内范围，低置信度和未决问题不能进入编码。
+## 组成
 
-第一版不引入进化系统，不做自动规则升级，优先保证流程轻量、可执行、可恢复。
+| 组成 | 用途 |
+|---|---|
+| `.claude/CLAUDE.md` | 调度入口、等级判断、阶段流转和恢复规则 |
+| `.claude/skills/` | 需求、影响面、UI、设计、计划、编码、审查、测试和提交流程 |
+| `.claude/agents/` | 独立编码与代码审查 Agent |
+| `.claude/constraints/` | 默认编码、日志和目录规范 |
+| `.claude/progress.json` | 当前迭代、任务、阻塞和待办输入 |
+| `.claude/hooks/` | 提交前审查覆盖与构建检查 |
+| `scripts/devflow.py` | 安装、检查和升级 DevFlow |
 
----
+需求、设计、计划和测试文档生成在目标项目的 `docs/` 中，不由升级工具覆盖。
 
-## 核心对象
+## 流程分级
 
-| 对象 | 说明 |
-|------|------|
-| 需求输入 | 用户的一份需求文档、Issue、截图说明、口头需求或一次迭代输入 |
-| 迭代需求文档 | `spec-analyzer` 输出的结构化需求分析结果 |
-| 需求项 | 最小分析、设计、开发、验收单位，可独立追踪 |
-| 需求设计文档 | `design-writer` 输出的详细设计，按一次需求输入成文，内部包含多个需求项 |
-| 界面设计文档 | `ui-designer` 输出的 UI 稿解析、界面契约和 UI 验收依据，不包含前端技术实现设计 |
-| 编码上下文 | 需求设计文档中的编码边界章节，不单独落盘 |
-| 开发计划 | `dev-planner` 输出的任务序列和状态记录，支持中断后继续 |
-| 审查状态 | `.claude/.review-status.json`，由 `code-review` 写入，记录结论、覆盖范围和代码内容哈希，供提交前检查使用 |
+等级按业务影响、技术契约风险和失败后果判断，不按文件或函数数量判断。
 
----
+| 等级 | 典型场景 | 默认流程 |
+|---|---|---|
+| T0 | 极小修改或不接入既有业务的独立新增 | 极简需求、简要影响、编码、审查、最小验证 |
+| T1 | 同模块局部行为变化，模式清楚 | 需求与简要影响确认、计划、编码、审查、验证 |
+| T2 | 跨模块、接口/数据、持久化、复杂 UI 或线程 | 需求、完整影响面、按需 UI、详设、计划、审查、测试 |
+| T3 | 跨工程协议、迁移、安全或不可逆变更 | T2 流程，加深风险、兼容和回退设计 |
 
-## 主流程
+T0/T1 默认不生成详细设计，只进行一次开发前确认。T2/T3 分别确认需求、影响面和详细设计。UI 原型仅在布局或交互存在歧义时生成。
 
-```mermaid
-flowchart TB
-    START(["需求输入"]) --> SPEC["spec-analyzer<br/>需求分析"]
-    SPEC --> CONFIRM{"需求规格已确认?"}
-    CONFIRM -->|"否"| SPEC
-    CONFIRM -->|"是"| IMPACT["impact-analyzer<br/>端到端影响面闭合"]
-    IMPACT --> UI{"涉及 UI?"}
-    UI -->|"是"| UID["ui-designer<br/>界面设计文档"]
-    UI -->|"否"| DESIGN
-    UID --> DESIGN["design-writer<br/>需求设计文档"]
-    DESIGN --> DCONF{"设计已确认且编码相关 TBD 为 0<br/>或无需确认?"}
-    DCONF -->|"否"| DESIGN
-    DCONF -->|"是"| PLAN["dev-planner<br/>编码任务 + 验证清单"]
-    PLAN --> BUILD["dev-builder<br/>独立 implementer 编码"]
-    BUILD --> REVIEW["code-review<br/>独立 code-reviewer 审查"]
-    REVIEW --> TEST["code-tester<br/>测试验证"]
-    TEST --> BUG{"失败?"}
-    BUG -->|"是"| FIX["bug-fixer<br/>证据-复现-根因-修复"]
-    FIX --> TEST
-    BUG -->|"否"| COMMIT["code-committer<br/>用户触发提交"]
-    COMMIT --> DONE(["完成"])
-```
+开发完成后的用户自测中，异常描述会直接进入 Bug 修复。每次修复只做针对性检查，不自动重复审查和构建；用户可随时要求执行，提交前必须对最终代码完成审查和构建。只有需要改变原有行为时才转为需求迭代。
 
----
+## 安装
 
-## 需求级别
-
-`T` 表示流程层级（Tier）；数字越大，影响范围和验证深度越高，不表示业务优先级。
-
-| 级别 | 典型条件 | 流程深度 |
-|------|----------|----------|
-| T0 | 极小、零歧义、不改接口/数据/行为链路 | 可跳过详细设计，由 `dev-builder` 临时组装编码输入 |
-| T1 | 单模块轻量变更，有少量交互或流程需约束 | 轻量影响面 + 必要设计 + 开发计划 |
-| T2 | 多模块、可能涉及接口/数据/UI 状态 | 完整影响面 + 需求设计文档 + 开发计划 |
-| T3 | 跨模块/跨工程/协议/数据模型/不可回滚变更 | 完整设计 + 风险确认 + 加深测试和审查 |
-
-聚合风险不改变单个需求项级别，但会影响开发计划、测试范围和审查重点。
-
-需求实际涉及线程、并发、缓存、资源生命周期或性能时，需求设计必须形成明确运行时约束；不涉及时只标记“不涉及”。T2/T3 需求以及涉及关键运行时、兼容、迁移、UI 或不可逆决策的 T1 需求，在生成开发计划前需要用户确认设计。
-
----
-
-## 中断恢复
-
-DevFlow 支持中断后继续，但依赖文件化状态。
-
-新 AI 窗口恢复时应读取：
-
-1. `.claude/progress.json`：当前迭代、当前 Skill、当前步骤、关键里程碑。
-2. `docs/08-计划/<需求迭代编号>-<需求主题>开发计划.md`：任务状态和执行记录。
-3. `docs/02-需求/<需求迭代编号>-<需求主题>需求.md`：已确认的需求规格。
-4. `docs/04-设计/需求设计/<需求迭代编号>-<需求主题>需求设计.md`：需求设计和编码上下文。
-5. `docs/05-UI/<需求迭代编号>-<需求主题>界面设计.md`：界面契约，如涉及 UI。
-6. `.claude/.review-status.json`：最近一次审查范围和结论。
-7. 测试报告或当前会话测试结论。
-
-如果 `progress.json` 为空，新窗口应扫描 `docs/08-计划` 找最近开发计划，以任务状态为准恢复。
-
-开发计划中的任务状态是恢复核心：
-
-```text
-待执行 / 执行中 / 已完成 / 阻塞 / 跳过
-```
-
----
-
-## 调度与恢复原则
-
-DevFlow 按需调度，不机械执行完整流水线。已有需求设计就继续计划，已有开发计划就按任务状态继续，代码已变更则优先审查和测试。
-
-需求规格未确认，或存在会影响方向、范围、验收的待确认问题时，不进入影响面分析。影响链路未闭合、界面契约未确认或需求设计仍有编码相关 TBD 时，也不得进入后续计划和编码。
-
-影响面分析按项目真实技术闭合入口、客户端/前端状态、请求构造、通信边界、接收处理、持久化/缓存、响应映射和展示结果，不预设 REST 或 RPC。新增/修改字段必须验证两侧映射和转换链路；同名对象按完整路径、真实符号、职责和可修改性消歧。
-
-开发计划记录基线提交和迭代开始时已有变更；无法证明属于当前需求的用户原有改动，不自动纳入任务、审查或提交范围。
-
-如果中途打开新 AI 窗口，先读取 `.claude/progress.json`；若索引为空，则扫描 `docs/08-计划`，以开发计划中的任务状态恢复。
-
-执行中任务优先：除非用户明确要求停止或切换，否则先完成当前编码、审查或测试任务，避免半成品和状态错乱。
-
-项目加载完成后，如果用户没有给出明确任务，DevFlow 应主动询问是否开始新需求、继续上次迭代，或切换到需求分析、详细设计、开发、审查、测试、提交等阶段。
-
----
-
-## 产物路径
-
-| 产物 | 路径 |
-|------|------|
-| 需求规格 | `docs/02-需求/<需求迭代编号>-<需求主题>需求.md` |
-| 影响面分析 | `docs/02-需求/<需求迭代编号>-<需求主题>影响面.md` |
-| 需求设计 | `docs/04-设计/需求设计/<需求迭代编号>-<需求主题>需求设计.md` |
-| 接口契约 | `docs/04-设计/接口契约/<需求迭代编号>-<需求主题>接口契约.md`（仅分离开发） |
-| 模块设计 | `docs/04-设计/模块设计/<模块名>.md` |
-| 架构设计 | `docs/01-总览/架构总览.md` |
-| UI 设计 | `docs/05-UI/<需求迭代编号>-<需求主题>界面设计.md` |
-| 开发计划 | `docs/08-计划/<需求迭代编号>-<需求主题>开发计划.md` |
-| 测试报告 | `docs/06-测试/<需求迭代编号>-<需求主题>测试报告.md` |
-
-多工程仓库可将工程级文档放在 `projects/<工程>/docs/`对应模块路径下。模块设计属于详细设计沉淀，仅在产生长期稳定事实时回写；没有模块文档时，先参考现有 `docs` 下的模块资料，没有资料再基于图谱和代码证据创建模块描述骨架。
-
----
-
-## 编码规范基线
-
-DevFlow 自带默认规范基线 `.claude/constraints/`：
-
-| 规范 | 文件 | 用途 |
-|------|------|------|
-| 通用编码约束 | `.claude/constraints/coding-req.md` | 命名、编码格式、错误处理、格式化等 |
-| 日志规范 | `.claude/constraints/log-req.md` | 日志约束 |
-| 目录规范 | `.claude/constraints/directory-spec.md` | 产物目录组织参考 |
-
-规范来源优先级（高 → 低）：用户本次指定 > 项目自定义规范 > DevFlow 基线。
-
-`dev-builder` 编码前从现有代码提取项目代码约定（编码（字符集 + BOM）与行尾、代码风格），随编码输入强制注入；项目约定优先于基线。用户可直接改写 `.claude/constraints/`，整体替换为自有规范。
-
-## Skills
-
-| 阶段 | Skill | 职责 |
-|------|-------|------|
-| 需求分析 | `spec-analyzer` | 整理需求项、验收标准和待确认问题 |
-| 影响面分析 | `impact-analyzer` | 验证端到端影响链路和流程深度 |
-| UI 设计 | `ui-designer` | 解析 UI 稿并形成界面契约 |
-| 详细设计 | `design-writer` | 编写统一的需求技术设计；分离开发时产出接口契约并过确认门 |
-| 开发计划 | `dev-planner` | 生成编码任务、验证清单和状态 |
-| 编码调度 | `dev-builder` | 提取项目代码约定，组装任务上下文并调用编码子 Agent |
-| 代码审查 | `code-review` | 组装审查上下文并调用审查子 Agent；通过后附提交草稿 |
-| 测试验证 | `code-tester` | 执行验证清单并记录证据 |
-| Bug 修复 | `bug-fixer` | 按复现、根因、修复、复测闭环处理失败 |
-| 提交辅助 | `code-committer` | 执行提交前检查、提交和按需推送 |
-
-## 子 Agent
-
-| 子 Agent | 调用方 | 职责 |
-|-----------|--------|------|
-| `implementer` | `dev-builder` | 在独立上下文中执行单个编码任务，遵循项目编码事实 |
-| `code-reviewer` | `code-review` | 在独立上下文中审查实际代码变更 |
-
----
-
-## Hooks
-
-Claude Code 的 `Stop` 表示当前回复结束，不代表编码完成。DevFlow 不使用 Stop hook 作为审查门禁，避免阻断需求确认、阶段汇报和等待用户输入。
-
-Git hooks 在 DevFlow 初始化时启用。AI 加载项目或执行 `code-committer` 时，应检查当前仓库配置；若未设置，则自动执行：
+要求 Python 3.10+。在 DevFlow 仓库中执行：
 
 ```powershell
-git config core.hooksPath .claude/hooks
+python scripts/devflow.py install --target F:\Dev\TargetProject
 ```
 
-启用后：
+无人值守安装：
 
-- `pre-commit` 先调用 `review-check.ps1`，校验独立 `code-reviewer` 执行标识、暂存代码审查覆盖和审查后内容变化。
-- `pre-commit` 再调用 `pre-commit-check.ps1`，执行编译检查；失败会阻止提交并路由到 `bug-fixer`。
-- DevFlow 不提供 post-commit 自动 push。推送只由用户明确要求时通过 `code-committer` 执行。
+```powershell
+python scripts/devflow.py install --target F:\Dev\TargetProject --yes
+```
 
-`implementer` 和 `code-reviewer` 是 `.claude/agents/` 中的独立子 Agent。复制或更新 `.claude` 后必须重启 Claude Code；如果 Agent 不可用，流程会阻塞，不允许主 Agent inline 代替编码或审查。
+安装完成后重启 Claude Code。
 
----
+## 升级
 
-## 即插即用约定
+推荐先检查和预览，再正式升级：
 
-DevFlow 只要求复制 `.claude` 目录。目标项目的需求、设计、计划、测试报告会在该项目自己的 `docs/...` 规范目录下生成。
+```powershell
+python scripts/devflow.py check --target F:\Dev\TargetProject
+python scripts/devflow.py update --target F:\Dev\TargetProject --dry-run
+python scripts/devflow.py update --target F:\Dev\TargetProject
+```
 
-本仓库不保留样例 `docs`，避免复制时污染目标项目。
+默认升级会：
 
-从旧版升级时，删除目标项目中遗留的 Stop hook 配置和 `.claude/hooks/stop-gate.ps1`，再重启 Claude Code，并确认 `core.hooksPath` 为 `.claude/hooks`。详细变更见 `releaseNote.txt`。
+- 将目标项目的 `.claude` 备份到 Git 目录下的 `devflow-backups/`。
+- 更新未被修改的 DevFlow 文件，并清理未定制的废弃文件。
+- 保留项目定制和冲突文件，并返回退出码 `2`。
+- 迁移 `progress.json`，保留当前迭代和历史状态。
+- 保留 `.review-status.json`、`.build-status.json`、`settings.local.json` 和项目 `docs/`。
+- 检查并设置 `core.hooksPath=.claude/hooks`。
+
+常用参数：
+
+| 参数 | 用途 |
+|---|---|
+| `--target PATH` | 指定目标 Git 项目 |
+| `--dry-run` | 仅预览，不修改文件 |
+| `--force` | 备份后覆盖冲突的受管文件，不覆盖运行状态 |
+| `--backup-dir PATH` | 指定备份目录 |
+| `--yes` | 跳过交互确认 |
+| `--verbose` | 显示未变化文件 |
+
+查看完整帮助：
+
+```powershell
+python scripts/devflow.py --help
+python scripts/devflow.py install --help
+python scripts/devflow.py check --help
+python scripts/devflow.py update --help
+```
+
+项目专属规范应写入项目根 `CLAUDE.md` 或项目文档，避免直接修改 DevFlow 默认 `constraints/`。升级完成后需要重启 Claude Code。
+
+## 手动升级
+
+没有 Python 环境时，先备份目标项目 `.claude`，再按下表拷贝：
+
+| 处理方式 | 文件 |
+|---|---|
+| 直接替换 | `.claude/CLAUDE.md`、`.claude/.gitignore`、`.claude/devflow-version.json`，以及 `agents/`、`skills/`、`hooks/` 中 DevFlow 提供的同名文件；保留项目额外文件 |
+| 比较后替换 | `.claude/constraints/`；未做项目定制可直接替换，已定制则保留并合并新规则 |
+| 必须保留 | `.claude/progress.json`、`.claude/settings.local.json`、`.claude/.review-status.json`、`.claude/.build-status.json`、项目根 `CLAUDE.md` 和 `docs/` |
+| 删除旧文件 | `.claude/skills/ui-designer/`；其能力已并入 `design-maker` |
+
+`pre-commit-check.ps1` 使用新文件同名覆盖，不保留版本后缀脚本。完成后执行 `git config core.hooksPath .claude/hooks`，并重启 Claude Code。
+
+除非明确不需要项目定制和历史状态，不建议直接覆盖整个 `.claude`。日常升级优先使用 `devflow.py update`，手动拷贝仅作为兜底方式。
