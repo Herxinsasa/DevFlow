@@ -114,9 +114,32 @@ try {
 }
 
 $validConclusion = (@("通过", "有条件通过", "PASS") -contains [string]$reviewData.conclusion) -or
-  (@("passed", "conditional_pass") -contains [string]$reviewData.status)
+  (@("passed", "conditional_pass") -contains [string]$reviewData.status) -or
+  (@("passed", "conditional") -contains [string]$reviewData.conclusion)
+if (@("failed", "不通过") -contains [string]$reviewData.conclusion) {
+  Write-Host "[pre-commit] Latest code-review conclusion is failed."
+  exit 1
+}
 if (-not $validConclusion) {
   Write-Host "[pre-commit] Latest code-review did not pass."
+  exit 1
+}
+
+$reviewScope = if ($reviewData.scope -ne $null) { [string]$reviewData.scope } else { [string]$reviewData.review_scope }
+if ($reviewScope -ne "full") {
+  Write-Host "[pre-commit] Latest code-review scope is missing or partial; run a full review for the staged submission."
+  exit 1
+}
+
+if ($reviewData.uncovered_scope -and @($reviewData.uncovered_scope).Count -gt 0) {
+  Write-Host "[pre-commit] Latest code-review has uncovered scope; run a full review for the staged submission."
+  exit 1
+}
+
+$isConditional = (@("有条件通过", "conditional") -contains [string]$reviewData.conclusion) -or
+  ([string]$reviewData.status -eq "conditional_pass")
+if ($isConditional -and (-not $reviewData.accepted_risks -or @($reviewData.accepted_risks).Count -eq 0)) {
+  Write-Host "[pre-commit] Conditional review has no accepted risk record; run code-review again."
   exit 1
 }
 

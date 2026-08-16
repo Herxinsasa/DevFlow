@@ -14,7 +14,7 @@ from pathlib import Path
 CODE_SUFFIXES = {
     ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx",
     ".cs", ".go", ".java", ".js", ".jsx", ".ts", ".tsx", ".py",
-    ".rs", ".swift", ".ui",
+    ".ps1", ".rs", ".swift", ".ui",
 }
 BUILD_FILES = {
     "CMakeLists.txt", "xmake.lua", "package.json", "package-lock.json",

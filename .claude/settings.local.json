@@ -7,7 +7,13 @@
       "Bash(git push *)",
       "Bash(powershell.exe *)",
       "Agent(implementer)",
-      "Agent(code-reviewer)"
+      "Agent(code-reviewer)",
+      "Bash(python -c ' *)",
+      "Bash(python -m py_compile .claude/hooks/build-credential.py)",
+      "Bash(cp /tmp/review-status.bak.json .claude/.review-status.json)",
+      "Bash(git restore *)",
+      "Bash(git add *)",
+      "Bash(git *)"
     ]
   }
 }

@@ -1,4 +1,4 @@
-# DevFlow 1.1
+# DevFlow 1.1.1
 
 DevFlow 是一套安装到 Git 项目中的 AI 迭代开发工作流，用于约束 AI 完成需求澄清、影响面分析、设计、编码、审查和验证，并支持任务中断后恢复。
 
@@ -42,6 +42,8 @@ DevFlow 不替代项目管理平台、产品决策和人工验收。一次性脚
 
 需求、设计、计划和测试文档生成在目标项目的 `docs/` 中，不由升级工具覆盖。
 
+各类事实分别维护：需求规格保存业务预期，影响面保存真实范围，详细设计保存技术契约，开发计划保存任务与验证当前状态，审查和构建凭据证明最终代码质量，`progress.json` 只负责恢复导航。UI 原型按需写入 `docs/05-UI/原型/<迭代ID>/`。
+
 ## 流程分级
 
 等级按业务影响、技术契约风险和失败后果判断，不按文件或函数数量判断。
@@ -53,7 +55,7 @@ DevFlow 不替代项目管理平台、产品决策和人工验收。一次性脚
 | T2 | 跨模块、接口/数据、持久化、复杂 UI 或线程 | 需求、完整影响面、按需 UI、详设、计划、审查、测试 |
 | T3 | 跨工程协议、迁移、安全或不可逆变更 | T2 流程，加深风险、兼容和回退设计 |
 
-T0/T1 默认不生成详细设计，只进行一次开发前确认。T2/T3 分别确认需求、影响面和详细设计。UI 原型仅在布局或交互存在歧义时生成。
+T0/T1 默认不生成详细设计，只进行一次开发前确认。T2/T3 分别确认需求、影响面和详细设计。UI 原型仅在需要直观看效果或交互歧义时生成；简单 UI 业务规则保留在需求规格，UI 技术落点写入详细设计。
 
 开发完成后的用户自测中，异常描述会直接进入 Bug 修复。每次修复只做针对性检查，不自动重复审查和构建；用户可随时要求执行，提交前必须对最终代码完成审查和构建。只有需要改变原有行为时才转为需求迭代。
 
@@ -123,7 +125,7 @@ python scripts/devflow.py update --help
 | 直接替换 | `.claude/CLAUDE.md`、`.claude/.gitignore`、`.claude/devflow-version.json`，以及 `agents/`、`skills/`、`hooks/` 中 DevFlow 提供的同名文件；保留项目额外文件 |
 | 比较后替换 | `.claude/constraints/`；未做项目定制可直接替换，已定制则保留并合并新规则 |
 | 必须保留 | `.claude/progress.json`、`.claude/settings.local.json`、`.claude/.review-status.json`、`.claude/.build-status.json`、项目根 `CLAUDE.md` 和 `docs/` |
-| 删除旧文件 | `.claude/skills/ui-designer/`；其能力已并入 `design-maker` |
+| 删除旧文件 | `.claude/skills/ui-designer/`；原型能力已并入 `design-maker` |
 
 `pre-commit-check.ps1` 使用新文件同名覆盖，不保留版本后缀脚本。完成后执行 `git config core.hooksPath .claude/hooks`，并重启 Claude Code。
 

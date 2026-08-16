@@ -51,7 +51,7 @@ def main() -> None:
         if content is not None:
             legacy[path] = [digest(content)]
     data = {
-        "version": "1.1.0",
+        "version": "1.1.1",
         "progress_schema_version": "1.1",
         "managed_files": managed,
         "deprecated_files": DEPRECATED,

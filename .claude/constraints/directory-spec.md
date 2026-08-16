@@ -1,6 +1,6 @@
 # 软件工程目录规范（AI 开发体系）
 
-本规范只约定**目录结构与文档组织**；需求、架构、设计类文档统一提供模板（`templates/`），见第七节。
+本规范只约定**目录结构与文档组织**；需求、架构和设计模板由对应 Skill 的 `references/` 提供，见第七节。
 
 ## 一、总则
 
@@ -9,8 +9,8 @@
 - **扁平化**：目录层级 ≤ 4 层（含根目录），以命名区分职责，不靠目录深度。
 - **AI 入口**：仓库根目录和每个子工程根目录**必须**有 `CLAUDE.md`。
 - **技术栈中立**：根目录与 `docs/`、`scripts/`、`tools/` 为技术栈无关的共享区；子工程内部结构遵循各自技术栈的社区惯例。
-- **文件名约定**：统一小写英文。单个完整单词不加分隔符（如 `errorcode.md`）；多词用 kebab-case（`xxx-xxx.md`）；允许常规缩写（如 `templ`）；`README.md`、`CLAUDE.md` 等约定俗成名除外。名字控短，能懂即可。
-- **按需剪枝**：以上为中大项目的完整结构。小项目按实际情况裁剪——无 UI 设计则不建 `ui/`，无需求设计文档则不建 `design/`，模块无需细分则不建 `modules/`。没有内容就不建路径。
+- **文件名约定**：项目自建通用文档统一小写英文。DevFlow 受管迭代文档使用 `.claude/CLAUDE.md` 和各 Skill 约定的编号中文目录与稳定迭代 ID，例如 `docs/02-需求/<迭代ID>-需求.md`。
+- **按需剪枝**：以上为中大项目的完整结构。小项目按实际情况裁剪；无 UI 原型则不建 `docs/05-UI/原型/`，无详细设计则不建对应迭代文件，无长期模块事实则不建 `docs/04-设计/模块设计/`。没有内容就不建路径。
 
 ## 二、仓库根目录
 
@@ -31,18 +31,18 @@
 
 ```
 docs/
-├── overview/        # architecture.md（架构、通信拓扑、设计约束）、directory-structure.md（本规范落地说明）
-├── requirements/    # <迭代号>-<主题>-req.md，每次需求迭代一份（需求项、验收标准、依赖、待确认问题）
-├── design/          # <迭代号>-<主题>-req-design.md，需求设计（客户端/服务端技术设计同文）
-├── protocol/        # comm-protocol.md、data-format.md、errorcode.md（跨工程错误码分段）
-├── ui/              # ui-spec.md、prototype/（设计稿截图，AI 可直接 Read）
-├── guide/           # deploy-guide.md（部署/操作指导）等指导性文档
-└── test/            # test-plan.md（策略、环境、冒烟清单）、test-report.md
+├── 01-总览/         # 架构总览、目录说明等长期文档
+├── 02-需求/         # <迭代ID>-需求.md、<迭代ID>-影响面.md
+├── 04-设计/         # 需求设计、模块设计等技术设计文档
+├── 05-UI/           # 原型/<迭代ID>/（按需 UI 原型/界面稿）
+├── 06-测试/         # <迭代ID>-测试报告.md
+├── 07-审查/         # <迭代ID>-代码审查.md
+└── 08-计划/         # <迭代ID>-开发计划.md
 ```
 
 - 文件按需创建，没有内容的分类不建空文件；空目录用 `.gitkeep` 占位。
-- `design/` 放按需求迭代的需求设计文档；长期模块事实放各工程 `docs/modules/`，长期架构事实放 `overview/architecture.md`。
-- 仓库级公共模块可按需在 `docs/modules/` 下建，格式同工程级 `modules/`。
+- `04-设计/需求设计/` 放按需求迭代的需求设计文档；长期模块事实放 `04-设计/模块设计/`，长期架构事实放 `01-总览/架构总览.md`。
+- 仓库级公共模块的长期事实统一放在 `docs/04-设计/模块设计/`，不另建 `docs/modules/`。
 
 ## 四、子工程目录（`projects/<name>/`）
 
@@ -118,10 +118,13 @@ projects/web_client/
 
 ```
 docs/
-├── overview/        # architecture.md（分层 + 状态机 + 流程图）、directory-structure.md（本工程目录约定）
-├── spec/            # coding-spec.md（补充 CLAUDE.md）、errorcode.md（本工程专用）、test-spec.md（含单测策略）
-└── modules/         # module-index.md（依赖关系 + 影响面速查）、<module-name>/README.md（模块设计文档：定位、对外接口、数据结构、核心流程、依赖）
+├── 01-总览/         # 架构总览、目录说明、模块索引
+├── 02-规范/         # 工程级编码、错误码、测试等补充规范
+└── 04-设计/
+    └── 模块设计/    # <模块名>.md：职责、外部接口、核心数据、流程与依赖
 ```
+
+迭代需求、影响面、UI、测试、审查和计划默认归档在仓库级 `docs/`。只有子工程被明确作为独立迭代边界并拥有自己的 DevFlow 文档根时，才在该子工程下使用相同编号目录。
 
 ## 六、CLAUDE.md 约定
 
@@ -134,14 +137,16 @@ docs/
 
 ## 七、文档模板
 
-模板位于本规范同级的 `templates/`。创建以下文档时复制对应模板，保证格式统一：
+模板由对应 Skill 维护。创建以下文档时读取表中的模板或输出规则：
 
 | 文档 | 存放位置 | 模板 |
 |------|---------|------|
-| 需求规格（按需求迭代） | `docs/requirements/<迭代号>-<主题>-req.md` | `templates/requirement-spec-templ.md` |
-| 需求设计（按需求迭代） | `docs/design/<迭代号>-<主题>-req-design.md` | `templates/req-design-templ.md` |
-| 架构总览（长期） | `docs/overview/architecture.md`、`projects/*/docs/overview/architecture.md` | `templates/architecture-templ.md` |
-| 模块设计（长期） | `projects/*/docs/modules/<module-name>/README.md` | `templates/module-design-templ.md` |
+| 需求规格（按需求迭代） | `docs/02-需求/<迭代ID>-需求.md` | `.claude/skills/spec-analyzer/references/需求规格_模板.md` |
+| 影响面分析（T2/T3） | `docs/02-需求/<迭代ID>-影响面.md` | `.claude/skills/impact-analyzer/SKILL.md` 内输出模板 |
+| UI 原型/界面稿（按需） | `docs/05-UI/原型/<迭代ID>/` | `.claude/skills/design-maker/SKILL.md` |
+| 需求设计（按需求迭代） | `docs/04-设计/需求设计/<迭代ID>-需求设计.md` | `.claude/skills/design-writer/references/需求设计_模板.md` |
+| 架构总览（长期） | `docs/01-总览/架构总览.md`、`projects/*/docs/01-总览/架构总览.md` | `.claude/skills/design-writer/references/软件架构_模板.md` |
+| 模块设计（长期） | `docs/04-设计/模块设计/<模块名>.md`、`projects/*/docs/04-设计/模块设计/<模块名>.md` | `.claude/skills/design-writer/references/模块设计_模板.md` |
 
 需求规格、需求设计为按需求迭代的一次性文档；架构总览、模块设计为长期文档，仅在长期事实变化时回写——一次性需求细节不得写入长期文档。
 
