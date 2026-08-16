@@ -1,6 +1,24 @@
 # DevFlow 1.1.1
 
-DevFlow 是一套安装到 Git 项目中的 AI 迭代开发工作流，用于约束 AI 完成需求澄清、影响面分析、设计、编码、审查和验证，并支持任务中断后恢复。
+DevFlow 是一套安装到 Git 项目中的 Claude Code 开发工作流，用于让 AI 面向日常迭代稳定完成开发：不偏离需求、不遗漏影响面、不过度开发，并能在中断后继续执行。
+
+核心用法：
+
+```text
+python scripts/devflow.py install --target F:\Dev\TargetProject
+重启 Claude Code，使自定义 Skill、子 Agent 和 hooks 生效
+Claude 会先恢复状态，并主动汇报当前迭代与下一步
+```
+
+Claude Code 会自动加载根目录 `CLAUDE.md` 与 `.claude/CLAUDE.md`，安装后重启即可生效。完整调度规则在 `.claude/CLAUDE.md`，本文档面向人类快速理解。
+
+---
+
+## 一句话定位
+
+```text
+按需求规格确认事实、按影响面锁定范围；用 T0-T3 分级控制流程深度，用开发计划逐任务执行，用独立子 Agent 控制编码与审查，用指纹凭据守住提交门禁。
+```
 
 ## 工作流特点
 
@@ -58,6 +76,44 @@ DevFlow 不替代项目管理平台、产品决策和人工验收。一次性脚
 T0/T1 默认不生成详细设计，只进行一次开发前确认。T2/T3 分别确认需求、影响面和详细设计。UI 原型仅在需要直观看效果或交互歧义时生成；简单 UI 业务规则保留在需求规格，UI 技术落点写入详细设计。
 
 开发完成后的用户自测中，异常描述会直接进入 Bug 修复。每次修复只做针对性检查，不自动重复审查和构建；用户可随时要求执行，提交前必须对最终代码完成审查和构建。只有需要改变原有行为时才转为需求迭代。
+
+## 主流程
+
+需求开发按 Tier 分级选择流程深度，T0/T1 一次开发前确认，T2/T3 分别确认需求、影响面和详细设计。T0/T1 同样执行影响分析，但为快速检查（简要影响），结论合并进需求规格、不单独归档；仅 T2/T3 归档独立影响面文档。失败只回退到真正失效的阶段，不重复已确认的前置事实。独立 Bug 与咨询只读入口不进入下图主链路。
+
+```mermaid
+flowchart TB
+    START(["需求输入"]) --> SPEC["spec-analyzer<br/>需求规格"]
+    SPEC --> SC{"规格已确认?"}
+    SC -->|"否"| SPEC
+    SC -->|"是"| TIER{"Tier 判定"}
+    TIER -->|"T0"| L0["简要影响 + 一次确认"]
+    L0 --> BUILD["dev-builder<br/>编码"]
+    TIER -->|"T1"| L1["简要影响 + 一次确认"]
+    L1 --> P1["dev-planner<br/>开发计划"]
+    P1 --> BUILD
+    TIER -->|"T2/T3"| IMP["impact-analyzer<br/>影响面闭合"]
+    IMP --> IC{"影响面已确认?"}
+    IC -->|"否"| IMP
+    IC -->|"是"| UIQ{"需要 UI 原型?"}
+    UIQ -->|"是"| UI["design-maker<br/>原型确认"]
+    UIQ -->|"否"| DW
+    UI --> DW["design-writer<br/>需求设计"]
+    DW --> DC{"设计已确认<br/>且未决项归零?"}
+    DC -->|"否"| DW
+    DC -->|"是"| P2["dev-planner<br/>开发计划"]
+    P2 --> BUILD
+    BUILD --> RV["code-review<br/>独立审查"]
+    RV -->|"需修复"| BUILD
+    RV -->|"通过"| TV["code-tester<br/>验证"]
+    TV -->|"失败"| BUG["bug-fixer<br/>证据 → 根因 → 修复"]
+    BUG --> TV
+    TV -->|"通过"| UV["用户验收"]
+    UV --> CC["code-committer<br/>用户触发提交"]
+    CC --> DONE(["完成"])
+```
+
+审查通过后，问题按 Critical、Important、Suggestion 分级：Critical/Important 必须修复后重审，Suggestion 不阻塞。Bug 修复期间只做针对性检查，提交前对最终代码统一补齐审查与构建。提交仅在用户明确要求时执行。
 
 ## 安装
 
