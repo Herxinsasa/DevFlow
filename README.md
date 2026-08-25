@@ -1,11 +1,11 @@
 # DevFlow 1.1.1
 
-DevFlow 是一套安装到 Git 项目中的 Claude Code 开发工作流，用于让 AI 面向日常迭代稳定完成开发：不偏离需求、不遗漏影响面、不过度开发，并能在中断后继续执行。
+DevFlow 是一套安装到现有项目目录中的 Claude Code 开发工作流，用于让 AI 面向日常迭代稳定完成开发：不偏离需求、不遗漏影响面、不过度开发，并能在中断后继续执行。项目可以使用 Git、SVN，也可以暂时不使用版本控制。
 
 核心用法：
 
 ```text
-python scripts/devflow.py install --target F:\Dev\TargetProject
+python scripts/devflow.py install --target "F:\Dev\TargetProject"
 重启 Claude Code，使自定义 Skill、子 Agent 和 hooks 生效
 Claude 会先恢复状态，并主动汇报当前迭代与下一步
 ```
@@ -31,7 +31,7 @@ Claude Code 会自动加载根目录 `CLAUDE.md` 与 `.claude/CLAUDE.md`，安�
 
 ## 适用场景
 
-适合使用 Git、由 AI 参与日常迭代的 C/C++、Qt、Web、服务端或混合技术栈项目，尤其适合：
+适合由 AI 参与日常迭代的 C/C++、Qt、Web、服务端或混合技术栈项目，尤其适合：
 
 - 需求涉及多个模块、接口、数据、UI 或持久化。
 - 开发任务可能跨会话执行或中途切换。
@@ -117,49 +117,52 @@ flowchart TB
 
 ## 安装
 
-要求 Python 3.10+。在 DevFlow 仓库中执行：
+要求 Python 3.10+。安装器会自动识别目标目录是 Git、SVN 还是无版本控制项目，不会初始化或转换版本控制。在 DevFlow 仓库中先预览，再安装：
 
 ```powershell
-python scripts/devflow.py install --target F:\Dev\TargetProject
+python scripts/devflow.py install --target "F:\Dev\TargetProject" --dry-run
+python scripts/devflow.py install --target "F:\Dev\TargetProject"
 ```
 
 无人值守安装：
 
 ```powershell
-python scripts/devflow.py install --target F:\Dev\TargetProject --yes
+python scripts/devflow.py install --target "F:\Dev\TargetProject" --yes
 ```
 
-安装完成后重启 Claude Code。
+目标目录本身是普通 Git 工作树根时默认配置 `.claude/hooks`，`--dry-run` 会同时预览该配置；Git monorepo 子项目、linked worktree、SVN 和无版本控制目录自动跳过。Git 仓库根不希望修改 `core.hooksPath` 时增加 `--no-hooks`。安装器不复制 `settings.local.json`，本机工具权限继续由项目使用者自行维护。安装完成后重启 Claude Code。
 
 ## 升级
 
-推荐先检查和预览，再正式升级：
+推荐先检查，再正式升级；`check` 已经提供完整预览，不需要再机械重复一次 `update --dry-run`：
 
 ```powershell
-python scripts/devflow.py check --target F:\Dev\TargetProject
-python scripts/devflow.py update --target F:\Dev\TargetProject --dry-run
-python scripts/devflow.py update --target F:\Dev\TargetProject
+python scripts/devflow.py check --target "F:\Dev\TargetProject"
+python scripts/devflow.py update --target "F:\Dev\TargetProject"
 ```
+
+自动化环境只需要预览退出码时，可直接使用 `update --dry-run`。
 
 默认升级会：
 
-- 将目标项目的 `.claude` 备份到 Git 目录下的 `devflow-backups/`。
+- Git 项目将 `.claude` 备份到 Git 元数据目录的 `devflow-backups/`；SVN 和无版本控制项目备份到目标目录外的 `<项目名>-devflow-backups/`。可用 `--backup-dir` 统一改位置。
 - 更新未被修改的 DevFlow 文件，并清理未定制的废弃文件。
 - 保留项目定制和冲突文件，并返回退出码 `2`。
 - 迁移 `progress.json`，保留当前迭代和历史状态。
 - 保留 `.review-status.json`、`.build-status.json`、`settings.local.json` 和项目 `docs/`。
-- 检查并设置 `core.hooksPath=.claude/hooks`。
+- 仅当目标目录本身是普通 Git 工作树根时检查并设置 `core.hooksPath=.claude/hooks`；`check` 与 `update --dry-run` 对该配置使用一致的预览和退出码；Git 子项目、linked worktree 及其他模式跳过。
 
 常用参数：
 
 | 参数 | 用途 |
 |---|---|
-| `--target PATH` | 指定目标 Git 项目 |
+| `--target PATH` | 指定目标项目目录；支持 Git、SVN 或无版本控制 |
 | `--dry-run` | 仅预览，不修改文件 |
 | `--force` | 备份后覆盖冲突的受管文件，不覆盖运行状态 |
 | `--backup-dir PATH` | 指定备份目录 |
 | `--yes` | 跳过交互确认 |
 | `--verbose` | 显示未变化文件 |
+| `--no-hooks` | Git 项目不检查或配置 `core.hooksPath` |
 
 查看完整帮助：
 
@@ -183,6 +186,6 @@ python scripts/devflow.py update --help
 | 必须保留 | `.claude/progress.json`、`.claude/settings.local.json`、`.claude/.review-status.json`、`.claude/.build-status.json`、项目根 `CLAUDE.md` 和 `docs/` |
 | 删除旧文件 | `.claude/skills/ui-designer/`；原型能力已并入 `design-maker` |
 
-`pre-commit-check.ps1` 使用新文件同名覆盖，不保留版本后缀脚本。完成后执行 `git config core.hooksPath .claude/hooks`，并重启 Claude Code。
+`pre-commit-check.ps1` 使用新文件同名覆盖，不保留版本后缀脚本。Git 项目可执行 `git config core.hooksPath .claude/hooks`；SVN 和无版本控制项目跳过此步。最后重启 Claude Code。
 
 除非明确不需要项目定制和历史状态，不建议直接覆盖整个 `.claude`。日常升级优先使用 `devflow.py update`，手动拷贝仅作为兜底方式。

@@ -20,7 +20,7 @@ STATE_FILES = {
     ".claude/.build-status.json",
     ".claude/settings.local.json",
 }
-INSTALL_SEED_FILES = {".claude/progress.json", ".claude/settings.local.json"}
+INSTALL_SEED_FILES = {".claude/progress.json"}
 
 
 @dataclass
@@ -58,20 +58,68 @@ def read_manifest(root: Path) -> dict:
     return data
 
 
-def validate_target(target: Path, install: bool = False) -> None:
-    if not target.exists() or not target.is_dir():
-        raise ValueError(f"target directory does not exist: {target}")
-    if not (target / ".git").exists():
-        raise ValueError(f"target is not a Git repository: {target}")
+def detect_vcs(target: Path) -> str:
+    target = target.resolve()
+    if (target / ".svn").exists():
+        return "svn"
+    if (target / ".git").exists():
+        return "git"
+    if shutil.which("svn"):
+        result = subprocess.run(["svn", "info", str(target)], capture_output=True, text=True)
+        if result.returncode == 0:
+            return "svn"
+    if shutil.which("git"):
+        result = subprocess.run(
+            ["git", "-C", str(target), "rev-parse", "--is-inside-work-tree"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip() == "true":
+            return "git"
+    return "none"
+
+
+def git_worktree_root(target: Path) -> Path | None:
+    if not shutil.which("git"):
+        return None
     result = subprocess.run(
-        ["git", "-C", str(target), "rev-parse", "--is-inside-work-tree"],
+        ["git", "-C", str(target), "rev-parse", "--show-toplevel"],
         capture_output=True,
         text=True,
     )
-    if result.returncode != 0 or result.stdout.strip() != "true":
-        raise ValueError(f"target is not a valid Git worktree: {target}")
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    return Path(result.stdout.strip()).resolve()
+
+
+def git_metadata_path(target: Path, option: str) -> Path | None:
+    if not shutil.which("git"):
+        return None
+    result = subprocess.run(
+        ["git", "-C", str(target), "rev-parse", option],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    path = Path(result.stdout.strip())
+    return path.resolve() if path.is_absolute() else (target / path).resolve()
+
+
+def is_linked_worktree(target: Path) -> bool:
+    git_dir = git_metadata_path(target, "--git-dir")
+    common_dir = git_metadata_path(target, "--git-common-dir")
+    return bool(git_dir and common_dir and git_dir != common_dir)
+
+
+def validate_target(target: Path, install: bool = False) -> str:
+    if not target.exists() or not target.is_dir():
+        raise ValueError(f"target directory does not exist: {target}")
+    if target.resolve().parent == target.resolve():
+        raise ValueError("target directory cannot be a filesystem root")
     if install and (target / ".claude").exists():
         raise ValueError(".claude already exists; use update instead of install")
+    return detect_vcs(target)
 
 
 def target_previous_hash(path: str, target: Path, target_manifest: dict | None, source_manifest: dict) -> str | None:
@@ -179,18 +227,23 @@ def migrate_milestones(value: object) -> dict:
     return milestones
 
 
-def backup_target(target: Path, backup_dir: Path | None) -> Path:
+def backup_target(target: Path, backup_dir: Path | None, vcs: str) -> Path:
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     if backup_dir:
         base = backup_dir.resolve()
-    else:
+    elif vcs == "git":
         result = subprocess.run(
-            ["git", "-C", str(target), "rev-parse", "--path-format=absolute", "--git-dir"],
+            ["git", "-C", str(target), "rev-parse", "--git-dir"],
             capture_output=True,
             text=True,
             check=True,
         )
-        base = Path(result.stdout.strip()) / "devflow-backups"
+        git_dir = Path(result.stdout.strip())
+        if not git_dir.is_absolute():
+            git_dir = (target / git_dir).resolve()
+        base = git_dir / "devflow-backups" / target.name
+    else:
+        base = target.parent / f"{target.name}-devflow-backups"
     claude_dir = (target / ".claude").resolve()
     if base == claude_dir or claude_dir in base.parents:
         raise ValueError("backup directory cannot be inside target .claude")
@@ -199,7 +252,7 @@ def backup_target(target: Path, backup_dir: Path | None) -> Path:
     while destination.exists():
         destination = base / f"devflow-{timestamp}-{counter}"
         counter += 1
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.mkdir(parents=True, exist_ok=False)
     if (target / ".claude").exists():
         shutil.copytree(target / ".claude", destination / ".claude")
     return destination
@@ -230,72 +283,132 @@ def apply_changes(target: Path, source: Path, manifest: dict, changes: list[Chan
     write_json(target / VERSION_FILE, manifest)
 
 
-def configure_hooks(target: Path) -> None:
-    subprocess.run(["git", "-C", str(target), "config", "core.hooksPath", ".claude/hooks"], check=True)
-
-
-def command_check(args: argparse.Namespace) -> int:
-    target = args.target.resolve()
-    validate_target(target)
-    source = source_root()
-    manifest = read_manifest(source)
-    changes = classify(target, source, manifest, force=False)
-    hooks_path = subprocess.run(
+def plan_hooks(target: Path, vcs: str, disabled: bool) -> tuple[str, str]:
+    if disabled:
+        return "disabled", ""
+    if vcs != "git":
+        return "non-git", ""
+    if git_worktree_root(target) != target.resolve():
+        return "git-subdirectory", ""
+    if is_linked_worktree(target):
+        return "git-linked-worktree", ""
+    current = subprocess.run(
         ["git", "-C", str(target), "config", "--get", "core.hooksPath"],
         capture_output=True,
         text=True,
     ).stdout.strip()
-    if hooks_path.replace("\\", "/") != ".claude/hooks":
-        changes.append(Change("config", "core.hooksPath", f"current value: {hooks_path or 'unset'}"))
+    if current.replace("\\", "/") == ".claude/hooks":
+        return "current", current
+    return "configure", current
+
+
+def hook_change(plan: tuple[str, str]) -> Change | None:
+    status, current = plan
+    if status == "configure":
+        return Change("config", "core.hooksPath", f"current value: {current or 'unset'}")
+    return None
+
+
+def apply_hook_plan(target: Path, plan: tuple[str, str]) -> str:
+    status, _ = plan
+    if status != "configure":
+        return status
+    subprocess.run(["git", "-C", str(target), "config", "core.hooksPath", ".claude/hooks"], check=True)
+    return "configured"
+
+
+def print_hook_result(result: str) -> None:
+    messages = {
+        "configured": "Git hooks configured: core.hooksPath=.claude/hooks",
+        "configure": "Git hooks would be configured: core.hooksPath=.claude/hooks",
+        "current": "Git hooks already configured: core.hooksPath=.claude/hooks",
+        "disabled": "Git hook configuration skipped by --no-hooks.",
+        "non-git": "Git hooks skipped for a non-Git target; workflow checks remain available without commit-hook enforcement.",
+        "git-subdirectory": "Git hooks skipped because the target is inside a larger Git worktree; repository-wide hook configuration was left unchanged.",
+        "git-linked-worktree": "Git hooks skipped for a linked worktree because core.hooksPath may be shared with other worktrees.",
+    }
+    print(messages[result])
+
+
+def command_check(args: argparse.Namespace) -> int:
+    target = args.target.resolve()
+    vcs = validate_target(target)
+    source = source_root()
+    manifest = read_manifest(source)
+    changes = classify(target, source, manifest, force=False)
+    hook_plan = plan_hooks(target, vcs, args.no_hooks)
+    planned_change = hook_change(hook_plan)
+    if planned_change:
+        changes.append(planned_change)
+    print(f"Target mode: {vcs}")
     print_changes(changes, args.verbose)
+    if not planned_change:
+        print_hook_result(hook_plan[0])
     return 2 if any(change.action in {"conflict", "config"} for change in changes) else 0
 
 
 def command_install(args: argparse.Namespace) -> int:
     target = args.target.resolve()
-    validate_target(target, install=True)
+    vcs = validate_target(target, install=True)
     source = source_root()
     manifest = read_manifest(source)
     changes = [Change("add", path) for path in sorted(manifest["managed_files"]) if path not in STATE_FILES]
     for path in sorted(INSTALL_SEED_FILES):
         changes.append(Change("add", path, "initialized"))
+    hook_plan = plan_hooks(target, vcs, args.no_hooks)
+    planned_change = hook_change(hook_plan)
+    if planned_change:
+        changes.append(planned_change)
+    print(f"Target mode: {vcs}")
     print_changes(changes, args.verbose)
     if args.dry_run:
+        if not planned_change:
+            print_hook_result(hook_plan[0])
         return 0
     if not args.yes:
         answer = input(f"Install DevFlow {manifest['version']} into {target}? [y/N] ").strip().lower()
         if answer not in {"y", "yes"}:
             return 1
-    managed_changes = [change for change in changes if change.path not in INSTALL_SEED_FILES]
+    managed_changes = [
+        change for change in changes
+        if change.action in {"add", "update", "delete"} and change.path not in INSTALL_SEED_FILES
+    ]
     apply_changes(target, source, manifest, managed_changes)
-    settings_target = target / ".claude/settings.local.json"
-    settings_target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source / ".claude/settings.local.json", settings_target)
     migrate_progress(source, target)
-    configure_hooks(target)
-    print("Installation complete. Restart Claude Code before using DevFlow.")
+    hook_result = apply_hook_plan(target, hook_plan)
+    print_hook_result(hook_result)
+    print("Installation complete. Review local tool permissions if needed, then restart Claude Code.")
     return 0
 
 
 def command_update(args: argparse.Namespace) -> int:
     target = args.target.resolve()
-    validate_target(target)
+    vcs = validate_target(target)
     source = source_root()
     manifest = read_manifest(source)
     changes = classify(target, source, manifest, force=args.force)
+    hook_plan = plan_hooks(target, vcs, args.no_hooks)
+    planned_change = hook_change(hook_plan)
+    if planned_change:
+        changes.append(planned_change)
+    print(f"Target mode: {vcs}")
     print_changes(changes, args.verbose)
     conflicts = [change for change in changes if change.action == "conflict"]
     if args.dry_run:
-        return 2 if conflicts else 0
+        if not planned_change:
+            print_hook_result(hook_plan[0])
+        return 2 if conflicts or planned_change else 0
     if not args.yes:
         answer = input(f"Back up and update DevFlow in {target}? [y/N] ").strip().lower()
         if answer not in {"y", "yes"}:
             return 1
-    backup = backup_target(target, args.backup_dir)
-    apply_changes(target, source, manifest, changes)
+    backup = backup_target(target, args.backup_dir, vcs)
+    file_changes = [change for change in changes if change.action in {"add", "update", "delete"}]
+    apply_changes(target, source, manifest, file_changes)
     migrate_progress(source, target)
-    configure_hooks(target)
+    hook_result = apply_hook_plan(target, hook_plan)
     print(f"Backup: {backup}")
+    print_hook_result(hook_result)
     if conflicts:
         print("Update completed with conflicts. Customized files were preserved; resolve them manually or rerun with --force.")
         return 2
@@ -304,10 +417,11 @@ def command_update(args: argparse.Namespace) -> int:
 
 
 def add_common_options(parser: argparse.ArgumentParser, *, changes: bool) -> None:
-    parser.add_argument("--target", required=True, type=Path, help="target Git project root")
+    parser.add_argument("--target", required=True, type=Path, help="target project directory (Git, SVN, or no VCS)")
     parser.add_argument("--dry-run", action="store_true", help="show actions without modifying files")
     parser.add_argument("--yes", action="store_true", help="skip the interactive confirmation")
     parser.add_argument("--verbose", action="store_true", help="show unchanged managed files")
+    parser.add_argument("--no-hooks", action="store_true", help="do not configure Git hooks when the target is a Git worktree")
     if changes:
         parser.add_argument("--force", action="store_true", help="back up and overwrite conflicting managed files; runtime state remains protected")
         parser.add_argument("--backup-dir", type=Path, help="custom backup parent directory")
@@ -316,14 +430,15 @@ def add_common_options(parser: argparse.ArgumentParser, *, changes: bool) -> Non
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Install or update DevFlow with a conservative, hash-based strategy.",
-        epilog="Recommended: check, then update --dry-run, then update. The default update preserves customized and runtime files.",
+        epilog="Recommended: preview install with --dry-run; for upgrades run check, then update. Customized and runtime files are preserved by default.",
     )
     subparsers = parser.add_subparsers(dest="command")
     check_parser = subparsers.add_parser("check", help="inspect update actions and conflicts")
     check_parser.add_argument("--target", required=True, type=Path)
     check_parser.add_argument("--verbose", action="store_true")
+    check_parser.add_argument("--no-hooks", action="store_true", help="do not report Git hook configuration")
     check_parser.set_defaults(handler=command_check)
-    install_parser = subparsers.add_parser("install", help="install DevFlow into a Git project")
+    install_parser = subparsers.add_parser("install", help="install DevFlow into a project directory")
     add_common_options(install_parser, changes=False)
     install_parser.set_defaults(handler=command_install)
     update_parser = subparsers.add_parser("update", help="back up and conservatively update DevFlow")
