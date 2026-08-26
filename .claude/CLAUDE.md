@@ -205,7 +205,7 @@ DevFlow 主动汇报，但不把内部检查流水倾倒给用户。
 
 ### dev-builder / implementer
 
-- T0 和简单 T1 可由主 Agent 直接编码；T1 多个独立或可并行边界可使用 implementer；T2/T3 默认使用独立 implementer。
+- T0 和简单 T1 可由主 Agent 直接编码；T1 多个独立或可并行边界可使用 implementer；T2/T3 必须调用独立 implementer。implementer 不可用时保持阻塞，只有用户明确确认降级后主 Agent 才可实施。
 - 同模块、共享行为和连续上下文可复用一个 implementer，不按计划行强制重建。
 - 编码阶段只执行最快的局部检查；正式构建由验证阶段统一执行。
 
