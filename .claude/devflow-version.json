@@ -29,9 +29,9 @@
     ".claude/skills/dev-planner/references/开发计划_模板.md": "655076a5b854497fde8e3549bcbdc8b0ff80142082656117d77e3fc06d1a1e0e",
     ".claude/skills/dev-planner/SKILL.md": "e358962ff92ab49b039cf2dd731af33a4e3688f0caefbd0ddb3d0da136cc7a34",
     ".claude/skills/impact-analyzer/references/影响面分析_模板.md": "f5370acd2de26984e3619df6f352217807b20dedbb95067748eddbe2615769f4",
-    ".claude/skills/impact-analyzer/SKILL.md": "b86a04d10acb0b3afc3ecfdc41bd4e7d4be3480d34e158de94df60653076dc90",
-    ".claude/skills/spec-analyzer/references/需求规格_模板.md": "87fae2830f0870d38728baecf756112d8939253350c896c2da12b4bbb93be3b2",
-    ".claude/skills/spec-analyzer/SKILL.md": "01ce06590cc0c72af823cab250439e9e2cea04ce3e2d00ee89547fa4f41948b8"
+    ".claude/skills/impact-analyzer/SKILL.md": "530284a0187557fdb7bac3598add9395d8bb7621b67cfb4b76148cb54c1270ed",
+    ".claude/skills/spec-analyzer/references/需求规格_模板.md": "85fa4d3a15a5e830ad655c7fe266a0b38e70782de8508bd4a3b4cef69726651c",
+    ".claude/skills/spec-analyzer/SKILL.md": "b39402f259076ed81f24d077d7e8cbae367fc98d5b8c7413b07d4e646105f719"
   },
   "deprecated_files": [
     ".claude/skills/ui-designer/SKILL.md",
