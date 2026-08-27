@@ -16,5 +16,6 @@ Desktop.ini
 # Temp
 *.tmp
 *.log
+*.review.json
 __pycache__/
 *.py[cod]

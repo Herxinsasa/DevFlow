@@ -32,6 +32,21 @@ def relative(path: Path) -> str:
     return path.relative_to(ROOT).as_posix()
 
 
+def is_managed_path(path: Path) -> bool:
+    """Return whether a `.claude` path is eligible for distribution."""
+    return (
+        "__pycache__" not in path.parts
+        and path.suffix.lower() not in {".pyc", ".pyo"}
+        and not path.name.endswith(".review.json")
+        and relative(path) not in EXCLUDED
+    )
+
+
+def is_managed_file(path: Path) -> bool:
+    """Return whether an existing `.claude` file belongs in the manifest."""
+    return path.is_file() and is_managed_path(path)
+
+
 def legacy_content(path: str) -> bytes | None:
     result = subprocess.run(["git", "-C", str(ROOT), "show", f"main:{path}"], capture_output=True)
     return result.stdout if result.returncode == 0 else None
@@ -40,11 +55,9 @@ def legacy_content(path: str) -> bytes | None:
 def main() -> None:
     files = sorted(
         path for path in (ROOT / ".claude").rglob("*")
-        if path.is_file()
-        and "__pycache__" not in path.parts
-        and path.suffix.lower() not in {".pyc", ".pyo"}
+        if is_managed_file(path)
     )
-    managed = {relative(path): digest(path.read_bytes()) for path in files if relative(path) not in EXCLUDED}
+    managed = {relative(path): digest(path.read_bytes()) for path in files}
     legacy: dict[str, list[str]] = {}
     for path in sorted(set(managed) | set(DEPRECATED)):
         content = legacy_content(path)

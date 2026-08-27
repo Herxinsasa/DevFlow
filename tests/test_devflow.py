@@ -11,11 +11,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "devflow.py"
+MANIFEST_SCRIPT = ROOT / "scripts" / "build_manifest.py"
 SPEC = importlib.util.spec_from_file_location("devflow_installer", SCRIPT)
 assert SPEC and SPEC.loader
 devflow = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = devflow
 SPEC.loader.exec_module(devflow)
+MANIFEST_SPEC = importlib.util.spec_from_file_location("devflow_manifest", MANIFEST_SCRIPT)
+assert MANIFEST_SPEC and MANIFEST_SPEC.loader
+build_manifest = importlib.util.module_from_spec(MANIFEST_SPEC)
+sys.modules[MANIFEST_SPEC.name] = build_manifest
+MANIFEST_SPEC.loader.exec_module(build_manifest)
 
 
 class DevFlowInstallerTests(unittest.TestCase):
@@ -56,6 +62,12 @@ class DevFlowInstallerTests(unittest.TestCase):
             filesystem_root = filesystem_root.parent
         with self.assertRaisesRegex(ValueError, "filesystem root"):
             devflow.validate_target(filesystem_root)
+
+    def test_manifest_excludes_local_review_artifacts(self) -> None:
+        review_artifact = ROOT / ".claude" / "skills" / "spec-analyzer" / "SKILL.md.review.json"
+        managed_skill = ROOT / ".claude" / "skills" / "spec-analyzer" / "SKILL.md"
+        self.assertFalse(build_manifest.is_managed_path(review_artifact))
+        self.assertTrue(build_manifest.is_managed_path(managed_skill))
 
     def test_explicit_svn_marker_wins_over_nested_git_detection(self) -> None:
         target = self.init_git()
