@@ -132,6 +132,8 @@ python scripts/devflow.py install --target "F:\Dev\TargetProject" --yes
 
 目标目录本身是普通 Git 工作树根时默认配置 `.claude/hooks`，`--dry-run` 会同时预览该配置；Git monorepo 子项目、linked worktree、SVN 和无版本控制目录自动跳过。Git 仓库根不希望修改 `core.hooksPath` 时增加 `--no-hooks`。安装器不复制 `settings.local.json`，本机工具权限继续由项目使用者自行维护。安装完成后重启 Claude Code。
 
+Git 仓库根启用 DevFlow hook 后，提交检查会按暂存文件向上匹配最近的 DevFlow 项目；嵌套项目分别使用各自的评审和构建凭据。已完整评审的文件集合允许只提交其中一部分；构建凭据必须与当前暂存文件集合及内容完全一致，暂存范围变化后需要重新构建。删除整个嵌套 DevFlow 项目时，其删除范围归入最近的存活父项目。
+
 ## 升级
 
 推荐先检查，再正式升级；`check` 已经提供完整预览，不需要再机械重复一次 `update --dry-run`：
@@ -140,6 +142,8 @@ python scripts/devflow.py install --target "F:\Dev\TargetProject" --yes
 python scripts/devflow.py check --target "F:\Dev\TargetProject"
 python scripts/devflow.py update --target "F:\Dev\TargetProject"
 ```
+
+`check` 默认只显示结论和需要处理的 `ADD / UPDATE / DELETE / CONFLICT / CONFIG`，已是最新状态时只输出简短的 `[OK]` 结论；使用 `--verbose` 才显示全部 `KEEP` 文件和正常 hook 状态。
 
 自动化环境只需要预览退出码时，可直接使用 `update --dry-run`。
 
@@ -151,6 +155,9 @@ python scripts/devflow.py update --target "F:\Dev\TargetProject"
 - 迁移 `progress.json`，保留当前迭代和历史状态。
 - 保留 `.review-status.json`、`.build-status.json`、`settings.local.json` 和项目 `docs/`。
 - 仅当目标目录本身是普通 Git 工作树根时检查并设置 `core.hooksPath=.claude/hooks`；`check` 与 `update --dry-run` 对该配置使用一致的预览和退出码；Git 子项目、linked worktree 及其他模式跳过。
+- 在备份和写入任何受管文件之前校验目标 `progress.json`；非法 JSON 会在 `validate` 阶段停止，并明确报告文件、行列和“未修改文件”。
+
+安装或升级失败时，输出统一的 `[FAILED]` 结果块，包含失败阶段、目标目录、原因、文件是否可能已变化、已创建的备份路径和恢复建议。升级已完成文件更新但仍有定制冲突时输出 `[ATTENTION]`，不与执行失败混淆。
 
 常用参数：
 

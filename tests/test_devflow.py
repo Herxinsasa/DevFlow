@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import importlib.util
+import io
+import json
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 
 
@@ -79,6 +82,7 @@ class DevFlowInstallerTests(unittest.TestCase):
         target.mkdir()
         result = self.run_cli("install", "--target", str(target), "--yes")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("Git hooks skipped for a non-Git target", result.stdout)
         self.assertFalse((target / ".claude" / "settings.local.json").exists())
         backup = devflow.backup_target(target, None, "none")
         self.assertEqual(backup.parent, target.parent / f"{target.name}-devflow-backups")
@@ -131,6 +135,121 @@ class DevFlowInstallerTests(unittest.TestCase):
         assert git_dir
         self.assertTrue(backup.is_relative_to(git_dir / "devflow-backups"))
         self.assertTrue((backup / ".claude" / "state.txt").exists())
+
+    def test_clean_check_is_concise_unless_verbose(self) -> None:
+        target = self.base / "plain"
+        target.mkdir()
+        installed = self.run_cli("install", "--target", str(target), "--yes", "--no-hooks")
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+
+        concise = self.run_cli("check", "--target", str(target), "--no-hooks")
+        self.assertEqual(concise.returncode, 0, concise.stderr)
+        self.assertIn("[OK] CHECK COMPLETE", concise.stdout)
+        self.assertNotIn("keep=", concise.stdout)
+        self.assertNotIn("KEEP", concise.stdout)
+
+        verbose = self.run_cli("check", "--target", str(target), "--no-hooks", "--verbose")
+        self.assertEqual(verbose.returncode, 0, verbose.stderr)
+        self.assertIn("KEEP", verbose.stdout)
+        self.assertIn("keep=", verbose.stdout)
+
+    def test_install_preview_summarizes_files_by_default(self) -> None:
+        target = self.base / "preview"
+        target.mkdir()
+        result = self.run_cli("install", "--target", str(target), "--dry-run", "--no-hooks")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("[PLAN] INSTALL PREVIEW", result.stdout)
+        self.assertIn("Files to add:", result.stdout)
+        self.assertNotIn(".claude/CLAUDE.md", result.stdout)
+        self.assertIn("No files were changed.", result.stdout)
+
+    def test_invalid_progress_blocks_update_before_backup_or_changes(self) -> None:
+        target = self.base / "invalid-progress"
+        target.mkdir()
+        installed = self.run_cli("install", "--target", str(target), "--yes", "--no-hooks")
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        managed = target / ".claude" / "CLAUDE.md"
+        before = managed.read_bytes()
+        (target / ".claude" / "progress.json").write_text(
+            '{"status": "ready"\n"current_step": "test"}\n', encoding="utf-8"
+        )
+
+        result = self.run_cli("update", "--target", str(target), "--yes", "--no-hooks")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("[FAILED] UPDATE FAILED", result.stderr)
+        self.assertIn("Phase: validate", result.stderr)
+        self.assertIn("invalid JSON", result.stderr)
+        self.assertIn("line 2", result.stderr)
+        self.assertIn("Files changed: no", result.stderr)
+        self.assertEqual(managed.read_bytes(), before)
+        self.assertFalse((target.parent / f"{target.name}-devflow-backups").exists())
+
+    def test_install_validation_failure_has_structured_output(self) -> None:
+        target = self.base / "existing"
+        (target / ".claude").mkdir(parents=True)
+        result = self.run_cli("install", "--target", str(target), "--dry-run")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("[FAILED] INSTALL FAILED", result.stderr)
+        self.assertIn("Phase: validate", result.stderr)
+        self.assertIn("use update instead of install", result.stderr)
+        self.assertIn("Files changed: no", result.stderr)
+
+    def test_invalid_manifest_structure_has_structured_output(self) -> None:
+        cases = {
+            "array": ["bad"],
+            "string": "bad",
+            "managed-list": {"version": "bad", "managed_files": []},
+            "legacy-list": {"version": "bad", "managed_files": {}, "legacy_hashes": []},
+        }
+        for name, content in cases.items():
+            with self.subTest(name=name):
+                target = self.base / f"invalid-manifest-{name}"
+                target.mkdir()
+                installed = self.run_cli("install", "--target", str(target), "--yes", "--no-hooks")
+                self.assertEqual(installed.returncode, 0, installed.stderr)
+                managed = target / ".claude" / "CLAUDE.md"
+                before = managed.read_bytes()
+                (target / ".claude" / "devflow-version.json").write_text(
+                    json.dumps(content) + "\n", encoding="utf-8"
+                )
+
+                result = self.run_cli("update", "--target", str(target), "--yes", "--no-hooks")
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("[FAILED] UPDATE FAILED", result.stderr)
+                self.assertIn("Phase: plan", result.stderr)
+                self.assertIn("invalid manifest", result.stderr)
+                self.assertIn("Files changed: no", result.stderr)
+                self.assertEqual(managed.read_bytes(), before)
+                self.assertFalse((target.parent / f"{target.name}-devflow-backups").exists())
+
+    def test_check_explains_modified_conflict_and_next_action(self) -> None:
+        target = self.base / "modified"
+        target.mkdir()
+        installed = self.run_cli("install", "--target", str(target), "--yes", "--no-hooks")
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        managed = target / ".claude" / "CLAUDE.md"
+        managed.write_text(managed.read_text(encoding="utf-8") + "\nproject customization\n", encoding="utf-8")
+
+        result = self.run_cli("check", "--target", str(target), "--no-hooks")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("[ATTENTION] UPDATE REQUIRES REVIEW", result.stdout)
+        self.assertIn("modified since the installed version; preserved", result.stdout)
+        self.assertIn("Next: review the conflicts", result.stdout)
+
+    def test_called_process_error_is_sanitized(self) -> None:
+        raw = subprocess.CalledProcessError(
+            128,
+            ["git", "-C", "target", "rev-parse", "--git-dir"],
+            stderr="fatal: not a git repository",
+        )
+        error = devflow.operation_error("UPDATE", "backup", self.base, raw)
+        output = io.StringIO()
+        with redirect_stderr(output):
+            devflow.print_failure(error)
+        rendered = output.getvalue()
+        self.assertIn("Reason: fatal: not a git repository", rendered)
+        self.assertNotIn("Command '[", rendered)
+        self.assertNotIn("['git',", rendered)
 
 
 if __name__ == "__main__":

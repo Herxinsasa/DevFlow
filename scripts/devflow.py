@@ -21,6 +21,7 @@ STATE_FILES = {
     ".claude/settings.local.json",
 }
 INSTALL_SEED_FILES = {".claude/progress.json"}
+HANDLED_ERRORS = (OSError, ValueError, subprocess.CalledProcessError)
 
 
 @dataclass
@@ -28,6 +29,17 @@ class Change:
     action: str
     path: str
     reason: str = ""
+
+
+@dataclass
+class DevFlowError(Exception):
+    command: str
+    phase: str
+    target: Path
+    reason: str
+    hint: str
+    files_changed: str = "no"
+    backup: Path | None = None
 
 
 def sha256(path: Path) -> str:
@@ -39,7 +51,13 @@ def load_json(path: Path, default: object | None = None) -> object:
         if default is not None:
             return default
         raise FileNotFoundError(path)
-    return json.loads(path.read_text(encoding="utf-8-sig"))
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"invalid JSON in {path}: {exc.msg} "
+            f"(line {exc.lineno}, column {exc.colno})"
+        ) from exc
 
 
 def write_json(path: Path, data: object) -> None:
@@ -51,11 +69,23 @@ def source_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def read_manifest(root: Path) -> dict:
-    data = load_json(root / VERSION_FILE)
-    if not isinstance(data, dict) or "managed_files" not in data:
-        raise ValueError(f"invalid manifest: {root / VERSION_FILE}")
+def validate_manifest(data: object, path: Path, *, require_managed: bool) -> dict:
+    if not isinstance(data, dict):
+        raise ValueError(f"invalid manifest in {path}: expected a JSON object")
+    managed = data.get("managed_files")
+    if require_managed and not isinstance(managed, dict):
+        raise ValueError(f"invalid manifest in {path}: managed_files must be an object")
+    if managed is not None and not isinstance(managed, dict):
+        raise ValueError(f"invalid manifest in {path}: managed_files must be an object")
+    legacy = data.get("legacy_hashes")
+    if legacy is not None and not isinstance(legacy, dict):
+        raise ValueError(f"invalid manifest in {path}: legacy_hashes must be an object")
     return data
+
+
+def read_manifest(root: Path) -> dict:
+    path = root / VERSION_FILE
+    return validate_manifest(load_json(path), path, require_managed=True)
 
 
 def detect_vcs(target: Path) -> str:
@@ -122,6 +152,26 @@ def validate_target(target: Path, install: bool = False) -> str:
     return detect_vcs(target)
 
 
+def validate_runtime_state(target: Path) -> None:
+    progress = target / ".claude/progress.json"
+    if not progress.exists():
+        return
+    data = load_json(progress)
+    if not isinstance(data, dict):
+        raise ValueError(f"invalid runtime state in {progress}: expected a JSON object")
+
+
+def installed_version(target: Path) -> str:
+    path = target / VERSION_FILE
+    if not path.exists():
+        return "unknown"
+    data = load_json(path)
+    if not isinstance(data, dict):
+        return "unknown"
+    value = data.get("version")
+    return str(value) if value else "unknown"
+
+
 def target_previous_hash(path: str, target: Path, target_manifest: dict | None, source_manifest: dict) -> str | None:
     if target_manifest:
         value = target_manifest.get("managed_files", {}).get(path)
@@ -141,7 +191,11 @@ def target_previous_hash(path: str, target: Path, target_manifest: dict | None, 
 
 def classify(target: Path, source: Path, source_manifest: dict, force: bool = False) -> list[Change]:
     target_manifest_path = target / VERSION_FILE
-    target_manifest = load_json(target_manifest_path) if target_manifest_path.exists() else None
+    target_manifest = (
+        validate_manifest(load_json(target_manifest_path), target_manifest_path, require_managed=False)
+        if target_manifest_path.exists()
+        else None
+    )
     changes: list[Change] = []
     for path, expected_hash in sorted(source_manifest["managed_files"].items()):
         src = source / path
@@ -159,7 +213,13 @@ def classify(target: Path, source: Path, source_manifest: dict, force: bool = Fa
         if force or (previous_hash and current_hash == previous_hash):
             changes.append(Change("update", path, "forced" if force else "unmodified managed file"))
         else:
-            changes.append(Change("conflict", path, "project customization or unknown legacy file"))
+            if previous_hash:
+                reason = "modified since the installed version; preserved"
+            elif target_manifest:
+                reason = "not tracked by the installed manifest; preserved"
+            else:
+                reason = "no trusted previous hash; preserved"
+            changes.append(Change("conflict", path, reason))
 
     for path in source_manifest.get("deprecated_files", []):
         dst = target / path
@@ -170,7 +230,12 @@ def classify(target: Path, source: Path, source_manifest: dict, force: bool = Fa
         if force or (previous_hash and current_hash == previous_hash):
             changes.append(Change("delete", path, "deprecated"))
         else:
-            changes.append(Change("conflict", path, "deprecated but customized"))
+            reason = (
+                "deprecated but modified; preserved"
+                if previous_hash
+                else "deprecated without a trusted baseline; preserved"
+            )
+            changes.append(Change("conflict", path, reason))
     return changes
 
 
@@ -258,14 +323,80 @@ def backup_target(target: Path, backup_dir: Path | None, vcs: str) -> Path:
     return destination
 
 
-def print_changes(changes: list[Change], verbose: bool) -> None:
+def change_counts(changes: list[Change]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for change in changes:
         counts[change.action] = counts.get(change.action, 0) + 1
+    return counts
+
+
+def print_changes(changes: list[Change], verbose: bool) -> None:
+    counts = change_counts(changes)
+    for change in changes:
         if verbose or change.action not in {"keep"}:
             suffix = f" ({change.reason})" if change.reason else ""
             print(f"{change.action.upper():8} {change.path}{suffix}")
-    print("Summary: " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items())))
+    visible_counts = counts if verbose else {key: value for key, value in counts.items() if key != "keep"}
+    if visible_counts:
+        print("Summary: " + ", ".join(f"{key}={value}" for key, value in sorted(visible_counts.items())))
+
+
+def format_error(exc: BaseException) -> str:
+    if isinstance(exc, subprocess.CalledProcessError):
+        detail = (exc.stderr or exc.stdout or "").strip() if isinstance(exc.stderr or exc.stdout or "", str) else ""
+        return detail or f"external command exited with code {exc.returncode}"
+    return str(exc)
+
+
+def failure_hint(command: str, phase: str, reason: str) -> str:
+    if ".claude already exists" in reason:
+        return "Run update for an existing DevFlow installation."
+    if "invalid JSON" in reason or "invalid runtime state" in reason:
+        return "Repair the reported JSON file, then retry. No files were changed."
+    if "target directory does not exist" in reason:
+        return "Correct --target and retry."
+    hints = {
+        "validate": "Correct the reported validation problem, then retry.",
+        "plan": "Correct the reported project or manifest problem, then retry.",
+        "backup": "Check backup permissions or provide --backup-dir, then retry.",
+        "apply": "Review the backup before retrying because managed files may be partially updated.",
+        "migrate": "Repair progress.json or restore the backup before retrying.",
+        "hooks": "Configure core.hooksPath manually or rerun with --no-hooks.",
+    }
+    return hints.get(phase, f"Correct the reported error, then rerun {command.lower()}.")
+
+
+def operation_error(
+    command: str,
+    phase: str,
+    target: Path,
+    exc: BaseException,
+    *,
+    files_changed: str = "no",
+    backup: Path | None = None,
+) -> DevFlowError:
+    reason = format_error(exc)
+    return DevFlowError(
+        command=command,
+        phase=phase,
+        target=target,
+        reason=reason,
+        hint=failure_hint(command, phase, reason),
+        files_changed=files_changed,
+        backup=backup,
+    )
+
+
+def print_failure(error: DevFlowError) -> None:
+    suffix = " PARTIALLY APPLIED" if error.files_changed != "no" else " FAILED"
+    print(f"[FAILED] {error.command}{suffix}", file=sys.stderr)
+    print(f"Phase: {error.phase}", file=sys.stderr)
+    print(f"Target: {error.target}", file=sys.stderr)
+    print(f"Reason: {error.reason}", file=sys.stderr)
+    print(f"Files changed: {error.files_changed}", file=sys.stderr)
+    if error.backup:
+        print(f"Backup: {error.backup}", file=sys.stderr)
+    print(f"Recovery: {error.hint}", file=sys.stderr)
 
 
 def apply_changes(target: Path, source: Path, manifest: dict, changes: list[Change]) -> None:
@@ -317,7 +448,7 @@ def apply_hook_plan(target: Path, plan: tuple[str, str]) -> str:
     return "configured"
 
 
-def print_hook_result(result: str) -> None:
+def print_hook_result(result: str, *, verbose: bool = True) -> None:
     messages = {
         "configured": "Git hooks configured: core.hooksPath=.claude/hooks",
         "configure": "Git hooks would be configured: core.hooksPath=.claude/hooks",
@@ -327,92 +458,182 @@ def print_hook_result(result: str) -> None:
         "git-subdirectory": "Git hooks skipped because the target is inside a larger Git worktree; repository-wide hook configuration was left unchanged.",
         "git-linked-worktree": "Git hooks skipped for a linked worktree because core.hooksPath may be shared with other worktrees.",
     }
-    print(messages[result])
+    if verbose or result not in {"current", "disabled", "non-git"}:
+        print(messages[result])
 
 
 def command_check(args: argparse.Namespace) -> int:
     target = args.target.resolve()
-    vcs = validate_target(target)
-    source = source_root()
-    manifest = read_manifest(source)
-    changes = classify(target, source, manifest, force=False)
-    hook_plan = plan_hooks(target, vcs, args.no_hooks)
-    planned_change = hook_change(hook_plan)
-    if planned_change:
-        changes.append(planned_change)
-    print(f"Target mode: {vcs}")
+    phase = "validate"
+    try:
+        vcs = validate_target(target)
+        validate_runtime_state(target)
+        phase = "plan"
+        source = source_root()
+        manifest = read_manifest(source)
+        current_version = installed_version(target)
+        changes = classify(target, source, manifest, force=False)
+        hook_plan = plan_hooks(target, vcs, args.no_hooks)
+        planned_change = hook_change(hook_plan)
+        if planned_change:
+            changes.append(planned_change)
+    except HANDLED_ERRORS as exc:
+        raise operation_error("CHECK", phase, target, exc) from exc
+
+    actionable = [change for change in changes if change.action != "keep"]
+    attention = any(change.action in {"conflict", "config"} for change in actionable)
+    if not actionable:
+        print("[OK] CHECK COMPLETE")
+        print(f"DevFlow {manifest['version']} is current. No action required.")
+        if args.verbose:
+            print(f"Target: {target}")
+            print(f"Target mode: {vcs}")
+            print_changes(changes, verbose=True)
+            print_hook_result(hook_plan[0])
+        return 0
+
+    print("[ATTENTION] UPDATE REQUIRES REVIEW" if attention else "[UPDATE] UPDATE AVAILABLE")
+    print(f"Current: {current_version}")
+    print(f"Available: {manifest['version']}")
     print_changes(changes, args.verbose)
-    if not planned_change:
+    if not planned_change and (args.verbose or hook_plan[0] in {"git-subdirectory", "git-linked-worktree"}):
         print_hook_result(hook_plan[0])
-    return 2 if any(change.action in {"conflict", "config"} for change in changes) else 0
+    conflict_count = sum(change.action == "conflict" for change in actionable)
+    if conflict_count:
+        print(f"Customized or untrusted files will be preserved: {conflict_count}")
+        print("Next: review the conflicts, or use update --force only after confirming overwrite is acceptable.")
+    else:
+        print("Next: run update to apply these changes.")
+    return 2 if attention else 0
 
 
 def command_install(args: argparse.Namespace) -> int:
     target = args.target.resolve()
-    vcs = validate_target(target, install=True)
-    source = source_root()
-    manifest = read_manifest(source)
-    changes = [Change("add", path) for path in sorted(manifest["managed_files"]) if path not in STATE_FILES]
-    for path in sorted(INSTALL_SEED_FILES):
-        changes.append(Change("add", path, "initialized"))
-    hook_plan = plan_hooks(target, vcs, args.no_hooks)
-    planned_change = hook_change(hook_plan)
-    if planned_change:
-        changes.append(planned_change)
-    print(f"Target mode: {vcs}")
-    print_changes(changes, args.verbose)
-    if args.dry_run:
-        if not planned_change:
-            print_hook_result(hook_plan[0])
-        return 0
-    if not args.yes:
-        answer = input(f"Install DevFlow {manifest['version']} into {target}? [y/N] ").strip().lower()
-        if answer not in {"y", "yes"}:
-            return 1
-    managed_changes = [
-        change for change in changes
-        if change.action in {"add", "update", "delete"} and change.path not in INSTALL_SEED_FILES
-    ]
-    apply_changes(target, source, manifest, managed_changes)
-    migrate_progress(source, target)
-    hook_result = apply_hook_plan(target, hook_plan)
-    print_hook_result(hook_result)
-    print("Installation complete. Review local tool permissions if needed, then restart Claude Code.")
+    phase = "validate"
+    files_changed = "no"
+    try:
+        vcs = validate_target(target, install=True)
+        phase = "plan"
+        source = source_root()
+        manifest = read_manifest(source)
+        changes = [Change("add", path) for path in sorted(manifest["managed_files"]) if path not in STATE_FILES]
+        for path in sorted(INSTALL_SEED_FILES):
+            changes.append(Change("add", path, "initialized"))
+        hook_plan = plan_hooks(target, vcs, args.no_hooks)
+        planned_change = hook_change(hook_plan)
+        if planned_change:
+            changes.append(planned_change)
+
+        print("[PLAN] INSTALL PREVIEW" if args.dry_run else "[PLAN] INSTALL")
+        print(f"Version: {manifest['version']}")
+        print(f"Target: {target}")
+        print(f"Target mode: {vcs}")
+        if args.verbose:
+            print_changes(changes, verbose=True)
+        else:
+            counts = change_counts(changes)
+            print(f"Files to add: {counts.get('add', 0)}")
+            if planned_change:
+                print_changes([planned_change], verbose=False)
+        if args.dry_run:
+            if not planned_change and hook_plan[0] not in {"current", "disabled"}:
+                print_hook_result(hook_plan[0], verbose=args.verbose)
+            print("No files were changed.")
+            return 0
+        phase = "confirm"
+        if not args.yes:
+            answer = input(f"Install DevFlow {manifest['version']} into {target}? [y/N] ").strip().lower()
+            if answer not in {"y", "yes"}:
+                print("[CANCELLED] INSTALL CANCELLED")
+                print("No files were changed.")
+                return 1
+        managed_changes = [
+            change for change in changes
+            if change.action in {"add", "update", "delete"} and change.path not in INSTALL_SEED_FILES
+        ]
+        phase = "apply"
+        files_changed = "possibly"
+        apply_changes(target, source, manifest, managed_changes)
+        phase = "migrate"
+        migrate_progress(source, target)
+        files_changed = "yes"
+        phase = "hooks"
+        hook_result = apply_hook_plan(target, hook_plan)
+    except HANDLED_ERRORS as exc:
+        raise operation_error("INSTALL", phase, target, exc, files_changed=files_changed) from exc
+
+    print("[OK] INSTALL COMPLETE")
+    print(f"Version: {manifest['version']}")
+    print(f"Installed files: {change_counts(changes).get('add', 0)}")
+    print_hook_result(hook_result, verbose=args.verbose)
+    print("Review local tool permissions if needed, then restart Claude Code.")
     return 0
 
 
 def command_update(args: argparse.Namespace) -> int:
     target = args.target.resolve()
-    vcs = validate_target(target)
-    source = source_root()
-    manifest = read_manifest(source)
-    changes = classify(target, source, manifest, force=args.force)
-    hook_plan = plan_hooks(target, vcs, args.no_hooks)
-    planned_change = hook_change(hook_plan)
-    if planned_change:
-        changes.append(planned_change)
-    print(f"Target mode: {vcs}")
-    print_changes(changes, args.verbose)
-    conflicts = [change for change in changes if change.action == "conflict"]
-    if args.dry_run:
-        if not planned_change:
-            print_hook_result(hook_plan[0])
-        return 2 if conflicts or planned_change else 0
-    if not args.yes:
-        answer = input(f"Back up and update DevFlow in {target}? [y/N] ").strip().lower()
-        if answer not in {"y", "yes"}:
-            return 1
-    backup = backup_target(target, args.backup_dir, vcs)
-    file_changes = [change for change in changes if change.action in {"add", "update", "delete"}]
-    apply_changes(target, source, manifest, file_changes)
-    migrate_progress(source, target)
-    hook_result = apply_hook_plan(target, hook_plan)
-    print(f"Backup: {backup}")
-    print_hook_result(hook_result)
+    phase = "validate"
+    backup: Path | None = None
+    files_changed = "no"
+    try:
+        vcs = validate_target(target)
+        validate_runtime_state(target)
+        phase = "plan"
+        source = source_root()
+        manifest = read_manifest(source)
+        current_version = installed_version(target)
+        changes = classify(target, source, manifest, force=args.force)
+        hook_plan = plan_hooks(target, vcs, args.no_hooks)
+        planned_change = hook_change(hook_plan)
+        if planned_change:
+            changes.append(planned_change)
+        conflicts = [change for change in changes if change.action == "conflict"]
+
+        print("[PLAN] UPDATE PREVIEW" if args.dry_run else "[PLAN] UPDATE")
+        print(f"Current: {current_version}")
+        print(f"Available: {manifest['version']}")
+        print_changes(changes, args.verbose)
+        if args.dry_run:
+            if not planned_change and (args.verbose or hook_plan[0] in {"git-subdirectory", "git-linked-worktree"}):
+                print_hook_result(hook_plan[0])
+            print("No files were changed.")
+            return 2 if conflicts or planned_change else 0
+        phase = "confirm"
+        if not args.yes:
+            answer = input(f"Back up and update DevFlow in {target}? [y/N] ").strip().lower()
+            if answer not in {"y", "yes"}:
+                print("[CANCELLED] UPDATE CANCELLED")
+                print("No files were changed.")
+                return 1
+        phase = "backup"
+        backup = backup_target(target, args.backup_dir, vcs)
+        phase = "apply"
+        files_changed = "possibly"
+        file_changes = [change for change in changes if change.action in {"add", "update", "delete"}]
+        apply_changes(target, source, manifest, file_changes)
+        phase = "migrate"
+        migrate_progress(source, target)
+        files_changed = "yes"
+        phase = "hooks"
+        hook_result = apply_hook_plan(target, hook_plan)
+    except HANDLED_ERRORS as exc:
+        raise operation_error(
+            "UPDATE", phase, target, exc, files_changed=files_changed, backup=backup
+        ) from exc
+
     if conflicts:
-        print("Update completed with conflicts. Customized files were preserved; resolve them manually or rerun with --force.")
+        print("[ATTENTION] UPDATE COMPLETED WITH CONFLICTS")
+    else:
+        print("[OK] UPDATE COMPLETE")
+    print(f"Previous version: {current_version}")
+    print(f"Current version: {manifest['version']}")
+    print(f"Backup: {backup}")
+    print_hook_result(hook_result, verbose=args.verbose)
+    if conflicts:
+        print(f"Preserved conflicts: {len(conflicts)}")
+        print("Customized files were not overwritten. Resolve them manually or review update --force.")
         return 2
-    print("Update complete. Restart Claude Code before continuing.")
+    print("Restart Claude Code before continuing.")
     return 0
 
 
@@ -455,8 +676,12 @@ def main() -> int:
         return 0
     try:
         return args.handler(args)
-    except (OSError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+    except DevFlowError as exc:
+        print_failure(exc)
+        return 1
+    except HANDLED_ERRORS as exc:
+        target = getattr(args, "target", Path(".")).resolve()
+        print_failure(operation_error(args.command.upper(), "unknown", target, exc))
         return 1
 
 
