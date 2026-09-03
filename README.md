@@ -1,4 +1,4 @@
-# DevFlow 1.1.1
+# DevFlow 1.1.2
 
 DevFlow 是一套安装到现有项目目录中的 Claude Code 开发工作流，用于让 AI 面向日常迭代稳定完成开发：不偏离需求、不遗漏影响面、不过度开发，并能在中断后继续执行。项目可以使用 Git、SVN，也可以暂时不使用版本控制。
 
@@ -96,7 +96,7 @@ flowchart TB
     IMP --> IC{"影响面已确认?"}
     IC -->|"否"| IMP
     IC -->|"是"| UIQ{"需要 UI 原型?"}
-    UIQ -->|"是"| UI["design-maker<br/>原型确认"]
+    UIQ -->|"是"| UI["ui-designer<br/>界面设计确认"]
     UIQ -->|"否"| DW
     UI --> DW["design-writer<br/>需求设计"]
     DW --> DC{"设计已确认<br/>且未决项归零?"}
@@ -191,7 +191,7 @@ python scripts/devflow.py update --help
 | 直接替换 | `.claude/CLAUDE.md`、`.claude/.gitignore`、`.claude/devflow-version.json`，以及 `agents/`、`skills/`、`hooks/` 中 DevFlow 提供的同名文件；保留项目额外文件 |
 | 比较后替换 | `.claude/constraints/`；未做项目定制可直接替换，已定制则保留并合并新规则 |
 | 必须保留 | `.claude/progress.json`、`.claude/settings.local.json`、`.claude/.review-status.json`、`.claude/.build-status.json`、项目根 `CLAUDE.md` 和 `docs/` |
-| 删除旧文件 | `.claude/skills/ui-designer/`；原型能力已并入 `design-maker` |
+| 删除旧文件 | `.claude/skills/design-maker/SKILL.md`、`.claude/skills/ui-designer/references/qt-frontend.md`、`.claude/skills/ui-designer/references/web-frontend.md`；界面设计能力由新版 `ui-designer` 提供 |
 
 `pre-commit-check.ps1` 使用新文件同名覆盖，不保留版本后缀脚本。Git 项目可执行 `git config core.hooksPath .claude/hooks`；SVN 和无版本控制项目跳过此步。最后重启 Claude Code。
 

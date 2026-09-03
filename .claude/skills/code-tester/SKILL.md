@@ -68,7 +68,7 @@ AI 无法执行 UI、硬件、现场、账号或人工判断测试时，生成�
 - 实现错误：回 `bug-fixer` 或当前执行上下文。
 - 需求歧义：回 `spec-analyzer`。
 - 范围遗漏：回 `impact-analyzer`。
-- UI 原型/界面稿缺失：回 `design-maker`。
+- UI 原型/界面稿缺失：回 `ui-designer`。
 - 技术设计缺失：回 `design-writer`。
 - 环境、权限、依赖、许可证、设备或外部服务：立即通知用户，不反复尝试配置。
 

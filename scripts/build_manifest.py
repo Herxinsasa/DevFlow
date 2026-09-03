@@ -18,7 +18,7 @@ EXCLUDED = {
     ".claude/.build-status.json",
 }
 DEPRECATED = [
-    ".claude/skills/ui-designer/SKILL.md",
+    ".claude/skills/design-maker/SKILL.md",
     ".claude/skills/ui-designer/references/qt-frontend.md",
     ".claude/skills/ui-designer/references/web-frontend.md",
 ]
@@ -64,7 +64,7 @@ def main() -> None:
         if content is not None:
             legacy[path] = [digest(content)]
     data = {
-        "version": "1.1.1",
+        "version": "1.1.2",
         "progress_schema_version": "1.1",
         "managed_files": managed,
         "deprecated_files": DEPRECATED,

@@ -66,6 +66,60 @@ class DevFlowInstallerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "filesystem root"):
             devflow.validate_target(filesystem_root)
 
+    def test_root_help_includes_complete_target_example(self) -> None:
+        result = self.run_cli("-h")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Examples:", result.stdout)
+        self.assertIn("update --target E:\\Projects\\MyProject", result.stdout)
+        self.assertIn("Use '<command> -h'", result.stdout)
+
+    def test_progress_migrates_renamed_ui_skill(self) -> None:
+        target = self.base / "renamed-skill"
+        (target / ".claude").mkdir(parents=True)
+        (target / ".claude" / "progress.json").write_text(
+            json.dumps({
+                "current_skill": "design-maker",
+                "milestones": {"design-maker": {"status": "waiting_confirmation"}},
+            }),
+            encoding="utf-8",
+        )
+
+        devflow.migrate_progress(ROOT, target)
+        migrated = json.loads(
+            (target / ".claude" / "progress.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(migrated["current_skill"], "ui-designer")
+        self.assertNotIn("design-maker", migrated["milestones"])
+        self.assertIn("ui-designer", migrated["milestones"])
+
+    def test_progress_removes_old_ui_skill_when_both_milestones_exist(self) -> None:
+        target = self.base / "mixed-ui-skill"
+        (target / ".claude").mkdir(parents=True)
+        (target / ".claude" / "progress.json").write_text(
+            json.dumps({
+                "current_skill": "design-maker",
+                "milestones": {
+                    "design-maker": {
+                        "status": "waiting_confirmation",
+                        "legacy_note": "preserved",
+                    },
+                    "ui-designer": {"status": "pending"},
+                },
+            }),
+            encoding="utf-8",
+        )
+
+        devflow.migrate_progress(ROOT, target)
+        migrated = json.loads(
+            (target / ".claude" / "progress.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(migrated["current_skill"], "ui-designer")
+        self.assertNotIn("design-maker", migrated["milestones"])
+        self.assertEqual(migrated["milestones"]["ui-designer"]["status"], "pending")
+        self.assertEqual(
+            migrated["milestones"]["ui-designer"]["legacy_note"], "preserved"
+        )
+
     def test_manifest_excludes_local_review_artifacts(self) -> None:
         review_artifact = ROOT / ".claude" / "skills" / "spec-analyzer" / "SKILL.md.review.json"
         managed_skill = ROOT / ".claude" / "skills" / "spec-analyzer" / "SKILL.md"

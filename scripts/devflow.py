@@ -22,6 +22,7 @@ STATE_FILES = {
 }
 INSTALL_SEED_FILES = {".claude/progress.json"}
 HANDLED_ERRORS = (OSError, ValueError, subprocess.CalledProcessError)
+SKILL_ALIASES = {"design-maker": "ui-designer"}
 
 
 @dataclass
@@ -256,9 +257,21 @@ def migrate_progress(source: Path, target: Path) -> Change:
     ):
         if key in old:
             merged[key] = old[key]
+    current_skill = merged.get("current_skill")
+    if isinstance(current_skill, str) and current_skill in SKILL_ALIASES:
+        merged["current_skill"] = SKILL_ALIASES[current_skill]
     merged["updated_at"] = old.get("updated_at") or old.get("last_session")
     merged["blocked_items"] = old.get("blocked_items", [])
-    merged["milestones"] = migrate_milestones(old.get("milestones", {}))
+    milestones = migrate_milestones(old.get("milestones", {}))
+    for old_name, new_name in SKILL_ALIASES.items():
+        if old_name not in milestones:
+            continue
+        old_milestone = milestones.pop(old_name)
+        if new_name not in milestones:
+            milestones[new_name] = old_milestone
+        elif isinstance(old_milestone, dict) and isinstance(milestones[new_name], dict):
+            milestones[new_name] = {**old_milestone, **milestones[new_name]}
+    merged["milestones"] = milestones
     merged["pending_inputs"] = old.get("pending_inputs", [])
     history = merged.get("iteration_history", [])
     merged["iteration_history"] = history[-10:] if isinstance(history, list) else []
@@ -651,7 +664,14 @@ def add_common_options(parser: argparse.ArgumentParser, *, changes: bool) -> Non
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Install or update DevFlow with a conservative, hash-based strategy.",
-        epilog="Recommended: preview install with --dry-run; for upgrades run check, then update. Customized and runtime files are preserved by default.",
+        epilog="""Examples:
+  python scripts/devflow.py install --target E:\\Projects\\MyProject --dry-run
+  python scripts/devflow.py install --target E:\\Projects\\MyProject
+  python scripts/devflow.py check --target E:\\Projects\\MyProject
+  python scripts/devflow.py update --target E:\\Projects\\MyProject
+
+Use '<command> -h' for that command's --target and optional arguments. Recommended: preview install with --dry-run; for upgrades run check, then update. Customized and runtime files are preserved by default.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command")
     check_parser = subparsers.add_parser("check", help="inspect update actions and conflicts")

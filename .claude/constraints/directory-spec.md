@@ -9,7 +9,7 @@
 - **扁平化**：目录层级 ≤ 4 层（含根目录），以命名区分职责，不靠目录深度。
 - **AI 入口**：仓库根目录和每个子工程根目录**必须**有 `CLAUDE.md`。
 - **技术栈中立**：根目录与 `docs/`、`scripts/`、`tools/` 为技术栈无关的共享区；子工程内部结构遵循各自技术栈的社区惯例。
-- **文件名约定**：项目自建通用文档统一小写英文。DevFlow 受管迭代文档使用 `.claude/CLAUDE.md` 和各 Skill 约定的编号中文目录与稳定迭代 ID，例如 `docs/02-需求/<迭代ID>-需求.md`。
+- **文件名约定**：项目自建通用文档统一小写英文。DevFlow 受管迭代文档使用 `.claude/CLAUDE.md` 和各 Skill 约定的编号中文目录与稳定迭代 ID，例如 `docs/02-需求/<迭代ID>-需求规格.md`。
 - **按需剪枝**：以上为中大项目的完整结构。小项目按实际情况裁剪；无 UI 原型则不建 `docs/05-UI/原型/`，无详细设计则不建对应迭代文件，无长期模块事实则不建 `docs/04-设计/模块设计/`。没有内容就不建路径。
 
 ## 二、仓库根目录
@@ -32,7 +32,7 @@
 ```
 docs/
 ├── 01-总览/         # 架构总览、目录说明等长期文档
-├── 02-需求/         # <迭代ID>-需求.md、<迭代ID>-影响面.md
+├── 02-需求/         # <迭代ID>-需求规格.md、<迭代ID>-影响面分析.md
 ├── 04-设计/         # 需求设计、模块设计等技术设计文档
 ├── 05-UI/           # 原型/<迭代ID>/（按需 UI 原型/界面稿）
 ├── 06-测试/         # <迭代ID>-测试报告.md
@@ -141,9 +141,9 @@ docs/
 
 | 文档 | 存放位置 | 模板 |
 |------|---------|------|
-| 需求规格（按需求迭代） | `docs/02-需求/<迭代ID>-需求.md` | `.claude/skills/spec-analyzer/references/需求规格_模板.md` |
-| 影响面分析（T2/T3） | `docs/02-需求/<迭代ID>-影响面.md` | `.claude/skills/impact-analyzer/SKILL.md` 内输出模板 |
-| UI 原型/界面稿（按需） | `docs/05-UI/原型/<迭代ID>/` | `.claude/skills/design-maker/SKILL.md` |
+| 需求规格（按需求迭代） | `docs/02-需求/<迭代ID>-需求规格.md` | `.claude/skills/spec-analyzer/references/需求规格_模板.md` |
+| 影响面分析（T2/T3） | `docs/02-需求/<迭代ID>-影响面分析.md` | `.claude/skills/impact-analyzer/SKILL.md` 内输出模板 |
+| UI 原型/界面稿（按需） | `docs/05-UI/原型/<迭代ID>/` | `.claude/skills/ui-designer/SKILL.md` |
 | 需求设计（按需求迭代） | `docs/04-设计/需求设计/<迭代ID>-需求设计.md` | `.claude/skills/design-writer/references/需求设计_模板.md` |
 | 架构总览（长期） | `docs/01-总览/架构总览.md`、`projects/*/docs/01-总览/架构总览.md` | `.claude/skills/design-writer/references/软件架构_模板.md` |
 | 模块设计（长期） | `docs/04-设计/模块设计/<模块名>.md`、`projects/*/docs/04-设计/模块设计/<模块名>.md` | `.claude/skills/design-writer/references/模块设计_模板.md` |
