@@ -1,9 +1,14 @@
 ---
 name: implementer
-description: 编码实现子 Agent。接收 dev-builder 组装的最小上下文，按需求、设计和项目规范完成一个或一组连续相关任务。
+description: 编码实现子 Agent；仅供 `dev-builder` 派发的独立子 Agent 加载，主 Agent 不得直接加载。接收 dev-builder 组装的最小上下文，按需求、设计和项目规范完成一个或一组连续相关任务。
+user-invocable: false
 ---
 
 # Implementer - 编码实现
+
+## 运行方式
+
+本 Skill 由主 Agent（`dev-builder`）通过 `subagent` 启动的独立子 Agent 加载执行；子 Agent 先调用 `skill` 加载本 Skill。主 Agent 不得直接在当前上下文加载本 Skill 代替独立实现。子 Agent 看不到父会话，任务包、需求/设计/UI 事实、允许与禁止范围、验收标准和验证方式由派发 prompt 提供；缺少关键输入时返回 `NEEDS_CONTEXT`。完成后按输出格式返回状态和变更摘要，开发计划由主 Agent 回写。frontmatter 的 `user-invocable: false` 只隐藏用户 `/name` 调用，不阻止模型加载，主 Agent 仍须遵守本条；本角色子 Agent 处于委派深度 1，不再嵌套派发。
 
 ## 定位
 

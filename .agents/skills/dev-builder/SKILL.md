@@ -1,6 +1,6 @@
 ---
 name: dev-builder
-description: 按开发计划和风险等级组织编码，组装最小上下文；T2/T3 必须调用独立 implementer，并维护当前任务状态。
+description: 按开发计划和风险等级组织编码，组装最小上下文；T2/T3 必须通过 `subagent` 派发独立 implementer，并维护当前任务状态。
 ---
 
 # Dev Builder - 编码调度
@@ -10,10 +10,10 @@ description: 按开发计划和风险等级组织编码，组装最小上下文�
 | 场景 | 执行者 |
 |---|---|
 | T0、简单 T1 | 主 Agent 可直接编码 |
-| T1 多个独立边界或适合并行 | 按需使用 implementer |
-| T2/T3 | 必须调用独立 implementer |
+| T1 多个独立边界或适合并行 | 按需通过 `subagent` 使用 implementer |
+| T2/T3 | 必须通过 `subagent` 派发独立 implementer |
 
-同模块、共享行为和连续任务可复用一个 implementer；机械重复接入整体派发一次，不按任务行强制新建。implementer 不可用时，T0/T1 可由主 Agent继续；T2/T3 必须标记阻塞，只有用户明确确认降级后才可由主 Agent实施并加强独立审查。
+同模块、共享行为和连续任务可复用一个 implementer；DSH 中通过 `send_message` 续用同一子 Agent，不重复新建。机械重复接入整体派发一次，不按任务行强制新建。implementer 不可用时，T0/T1 可由主 Agent继续；T2/T3 必须标记阻塞，只有用户明确确认降级后才可由主 Agent实施并加强独立审查。
 
 ## 执行前检查
 
@@ -66,10 +66,10 @@ description: 按开发计划和风险等级组织编码，组装最小上下文�
 ## 执行步骤
 
 1. 核对基线和工作区，保留用户原有修改；只选择待执行、依赖已满足且无活动阻塞或待确认项的 `TASK-xxx`。没有可执行任务时，区分完成、依赖阻塞、等待用户确认，或仅剩 `VERIFY-xxx`。
-2. T2/T3 先确认 `implementer` 可调用；不可用时记录 `BLOCKED_AGENT_UNAVAILABLE`，不写入执行中、不直接编码。
+2. T2/T3 先确认 `implementer` 角色 Skill 存在且当前 Harness 能启动独立子 Agent；DSH 使用 `subagent`（不使用 `subagent_fork`），不可用时记录为阻塞并注明“子 Agent 不可用”，不写入执行中、不直接编码。
 3. 在任务开始前按“输入”和“编码前规范加载”重新组装实现依据；T2/T3 补充详细设计、运行时和接口/数据契约，UI 任务补充已确认 UI 事实和现有界面基线，跳过详设的任务补充影响面实现要点。缺少影响编码方向的参考机制、权威类型、关键契约或应确认的 UI 设计时回前置阶段或保持阻塞，不派发。依据齐备后才将任务更新为执行中并同步 `progress.json`。
    已选择 TDD 时，将当前可观察用例和逐个行为的红、绿、重构要求放入任务包；不要求先批量写完所有测试。未选择 TDD 时，不因存在 `test-designer` 用例而改写任务执行方式。
-4. 按执行策略实施：T0、简单 T1 可由主 Agent 编码；T1 按需调用 `implementer`；T2/T3 必须调用 `implementer` 并传入任务包，主 Agent 不得代替编码。派发只允许当前范围和验收标准，禁止计划外修改。
+4. 按执行策略实施：T0、简单 T1 可由主 Agent 编码；T1 按需通过 `subagent` 启动 implementer；T2/T3 必须通过 `subagent` 启动独立 implementer，prompt 第一句要求其先调用 `skill` 加载 `implementer`，主 Agent 不得直接加载角色 Skill 编码。传入当前任务包，只允许当前范围和验收标准，禁止计划外修改；等待子 Agent 完成通知并核对返回结果后，才更新任务状态。
 5. 核对 implementer 的实际命令与输出；主 Agent 自行编码、证据缺失或代码检查后变化时，对本任务修改的每个文本源文件按目标编码、BOM 和行尾调用 `.devflow/scripts/check-source-file.py`，原文件已有 U+FFFD 时传入编辑前快照。再运行项目已有格式器的检查模式或对应静态格式检查，只针对本次文件，不因局部任务重排全仓库。工具失败、格式器不可用或项目约定不明时记录实际限制并处理，不能凭执行者一句“格式正确”标记通过。
 
    调用形式：`python .devflow/scripts/check-source-file.py --root <项目根> --file <相对路径> --encoding <目标编码> --bom require|forbid --eol lf|crlf [--baseline <编辑前快照> --baseline-encoding <原编码>]`。文件与配置先由当前任务事实确定；脚本不猜编码或自动改写文件。
@@ -106,8 +106,8 @@ description: 按开发计划和风险等级组织编码，组装最小上下文�
 
 - 是否只读取当前任务需要的最小上下文？
 - 是否保留并避开用户既有无关修改？
-- T2/T3 是否已实际调用 implementer；未调用时是否保持阻塞或取得用户明确降级确认？
-- 执行者选择是否符合任务等级和复杂度，而非机械每任务新建 Agent？
+- T2/T3 是否通过 `subagent` 启动并等待独立 implementer；prompt 是否要求其先加载角色 Skill；未调用时是否保持阻塞或取得用户明确降级确认？
+- 执行者选择是否符合任务等级和复杂度，而非机械每任务新建 Agent？同一 implementer 连续执行时是否用 `send_message` 续用？
 - 是否缺少需求、接口、数据或 UI 契约时停止并回前置阶段？
 - 编码与日志规范是否已注入，同层同类实现、权威类型来源和适用的既有实现机制是否已确认？
 - 当前 `TASK` 是否在派发前重新取证，并将关键路径/符号、机制、权威类型与文件格式结论写入恢复信息？

@@ -1,9 +1,14 @@
 ---
 name: code-reviewer
-description: 独立审查产品代码变更。根据实际变更集、需求与设计、源码、验证结果和调度层传入的适用项目约束，输出带证据、影响和置信度的候选问题，不直接修改文件。
+description: 独立审查产品代码变更；仅供 `code-review` 派发的独立子 Agent 加载，主 Agent 不得直接加载。根据实际变更集、需求与设计、源码、验证结果和调度层传入的适用项目约束，输出带证据、影响和置信度的候选问题，不直接修改文件。
+user-invocable: false
 ---
 
 # Code Reviewer - 代码审查
+
+## 运行方式
+
+本 Skill 由主 Agent 通过 `subagent` 启动的独立子 Agent 加载执行；子 Agent 先调用 `skill` 加载本 Skill。主 Agent 不得直接在当前上下文加载本 Skill 代替独立审查。子 Agent 看不到父会话，审查范围、变更集、基线、需求与设计路径、验证结果和适用约束由派发 prompt 提供。完成后只返回结论和候选问题，不修改文件、不写事实源。frontmatter 的 `user-invocable: false` 只隐藏用户 `/name` 调用，不阻止模型加载，主 Agent 仍须遵守本条；本角色子 Agent 处于委派深度 1，不再嵌套派发。
 
 ## 定位
 

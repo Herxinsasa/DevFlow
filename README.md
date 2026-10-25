@@ -4,18 +4,36 @@
 
 ## 使用范围
 
-将本目录放在项目根使用。两种 Harness 都读取项目根 `AGENTS.md` 并发现 `.agents/skills/`；独立评审和实现由主 Agent 启动全新子 Agent，加载对应角色 Skill。合并到现有项目时，先合并已有 `AGENTS.md` 与同名 Skill，保留已有项目状态和约束，避免覆盖用户规则。
+将本目录放在项目根使用。两种 Harness 都读取项目根 `AGENTS.md` 并发现 `.agents/skills/`；独立评审和 T2/T3 独立实现由主 Agent 派发全新子 Agent，由子 Agent 加载对应角色 Skill；T0/简单 T1 按 `dev-builder` 执行策略可由主 Agent 直接编码。合并到现有项目时，先合并已有 `AGENTS.md` 与同名 Skill，保留已有项目状态和约束，避免覆盖用户规则。
 
-在 DSH Web 中，还需把该项目根目录登记并选为当前工作区；仅从该目录运行 `npx @deepseek-ai/dsh web` 不等于选中了项目工作区。若仍处于“默认工作区”，DSH 的原生 `skill` 工具不会发现项目内 `.agents/skills/`，会报告 Skill 不存在。
+全局安装 DSH 后可直接运行 `dsh web`。在 DSH Web 中，需要把该项目根目录登记并选为当前工作区；若仍处于“默认工作区”，DSH 的原生 `skill` 工具不会发现项目内 `.agents/skills/`，会报告 Skill 不存在。
 
 `.devflow/` 仅是 DevFlow 自有的约束、脚本和状态目录，并非任何 Harness 的官方目录。当前需手动维护 `.devflow/progress.json`，并执行提交前审查、构建和验证门禁；Git hook 仅在手动配置后对提交时的审查与构建提供兜底。
+
+### DSH 运行前提
+
+- 选择项目根为工作区，并启用原生 `skill` 与 `subagent` 工具。DSH 没有 `subagent_type`，角色只能由 `subagent` 的 prompt 指定；prompt 第一句必须要求子 Agent 先 `skill` 加载角色 Skill，主 Agent 不得直接加载角色 Skill。
+- 三个角色 Skill 的 `user-invocable: false` 只隐藏用户 `/name` 调用，不阻止模型加载；角色隔离仍靠本条约定和独立评审流程，不能把它当成硬隔离。
+- 子 Agent 看不到父会话；派发时把用户原始输入、范围、基线、允许/禁止范围和输出要求写入 prompt。`subagent` 异步返回，主 Agent 必须等待完成通知并核对；同一子 Agent 用 `send_message` 续用。默认委派深度为 1，角色子 Agent 不再嵌套。
+- 会话权限需允许工作区写入、`pwsh`、`git` 和项目构建命令；构建需要网络时同时放行。DSH 的权限在会话/profile 权限预设中配置，没有项目级 `permissions.allow` 文件。
+- `AGENTS.md` 受 DSH 指令预算限制；base profile 默认 65,536 字节，实际以当前 profile 为准。合并项目自有 `AGENTS.md` 后需复核，避免末尾门禁被截断。
+- Git 项目需手动执行 `git config --local core.hooksPath .devflow/hooks` 才会触发提交门禁。
+
+角色派发 prompt 的最小结构：
+
+```text
+你是独立 <角色>。第一步：调用 `skill` 工具加载 `<角色>`，再按该 Skill 执行。
+任务与范围：...；基线/变更集：...；事实与路径：...；允许/禁止范围：...；输出要求：...
+```
+
+DSH 用 `subagent` 启动，等待完成通知后由主 Agent 核对；不要让主 Agent 直接加载角色 Skill。
 
 ---
 
 ## 一句话定位
 
 ```text
-按需求规格确认事实、按影响面锁定范围；用 T0-T3 分级控制流程深度，用开发计划逐任务执行，用独立子 Agent 控制编码与审查，提交前核对指纹凭据。
+按需求规格确认事实、按影响面锁定范围；用 T0-T3 分级控制流程深度，用开发计划逐任务执行，用独立子 Agent 控制审查和 T2/T3 编码，提交前核对指纹凭据。
 ```
 
 ## 工作流特点
@@ -53,6 +71,8 @@ DevFlow 不替代项目管理平台、产品决策和人工验收。一次性脚
 | `.devflow/constraints/` | 默认编码、日志、文档和目录规范；可增加项目约束 |
 | `.devflow/progress.json` | 当前迭代、任务、阻塞和待办输入 |
 | `.devflow/scripts/` | 项目模板/约束解析与修改文件的编码检查 |
+| `releaseNote.txt` | 版本修订记录 |
+| `tests/` | DSH 适配与入口一致性回归测试 |
 
 需求、设计、计划和测试文档生成在目标项目的 `docs/` 中；更新本适配版时应保留这些项目产物。
 
@@ -208,13 +228,18 @@ flowchart TB
 | `.devflow/scripts/` | DevFlow 模板/约束解析和文件编码检查 |
 | `.devflow/hooks/` | Git 提交前审查和构建检查 |
 | `.devflow/document-policy.md` | 文档编写时按需加载的总控规则 |
+| `tests/` | DSH 适配与入口一致性回归测试 |
 
-跨 Codex 与 DSH 的项目推荐使用 `AGENTS.md` + `.agents/skills/<技能>/SKILL.md`。这是两边官方文档共同支持的交集：Codex 将 `.agents/skills/` 作为仓库 Skill 路径，DSH 同时扫描 `.dsh/skills/` 与 `.agents/skills/`。三个角色 Skill 须由独立子 Agent 加载，它们不是 DSH Agent 预设；具体启动工具按所用 Harness 选择。
+跨 Codex 与 DSH 的项目推荐使用 `AGENTS.md` + `.agents/skills/<技能>/SKILL.md`。这是两边官方文档共同支持的交集：Codex 将 `.agents/skills/` 作为仓库 Skill 路径，DSH 同时扫描 `.dsh/skills/` 与 `.agents/skills/`。三个角色 Skill 须由独立子 Agent 加载，它们不是 DSH Agent 预设；DSH 没有 `subagent_type`，具体启动工具按所用 Harness 选择。
 
 
 官方依据：[Codex 项目自定义说明](https://learn.chatgpt.com/docs/customization/overview)、[Codex Skill 发现路径](https://learn.chatgpt.com/docs/build-skills)、[DSH Skill 发现顺序](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/skills.md)、[DSH 项目指令加载](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/context/agent-instructions/README.md)。这里的“推荐”是依据两边官方支持路径得出的跨工具选择，并非 DSH 官方单独指定的首选路径。
 
 替换默认模板时，直接修改 `.agents/skills/<技能>/references/` 下的对应文件；新增约束放入 `.devflow/constraints/`。若模板或约束放在这些目录之外，可在项目根配置 `devflow.project.json`，解析规则见 `AGENTS.md` 与 `.devflow/document-policy.md`。发生实质冲突时由用户确认。
+
+## 安装与升级
+
+本目录当前是手动安装/升级包，没有 DSH 版 `devflow.py`、managed-file manifest 或自动升级脚本。合并到项目根时，对以下受管路径做差异合并，不删除项目新增文件：`AGENTS.md`、`.agents/skills/`、`.devflow/constraints/`、`.devflow/scripts/`、`.devflow/hooks/`、`.devflow/document-policy.md` 和 `.devflow/devflow-version.json`；保留项目自己的 `docs/`、`.devflow/constraints/` 中新增的约束、`.devflow/progress.json` 和状态凭据。升级前先备份并 diff 受管路径，手动合并同名 Skill/约束；项目自有 `devflow.project.json` 和 `.agents` 之外的模板不改写。自动安装/升级脚本适配完成前，不要用脚本批量覆盖。
 
 ## Git 提交前门禁
 
@@ -227,4 +252,4 @@ git config --local core.hooksPath .devflow/hooks
 git config --local --get core.hooksPath
 ```
 
-已有 hook 路径时先合并原有 hook，不要直接覆盖配置。Windows 使用 `powershell.exe`，其他系统需要 `pwsh`。未配置 Git hook、SVN 和无版本控制项目仍由 `code-committer` 按相同门禁检查。安装/升级脚本尚未适配；本目录也没有 DSH 运行时端到端实测记录。
+已有 hook 路径时先合并原有 hook，不要直接覆盖配置。Windows 使用 `powershell.exe`，其他系统需要 `pwsh`。未配置 Git hook、SVN 和无版本控制项目仍由 `code-committer` 按相同门禁检查。安装/升级脚本尚未适配，按“安装与升级”手动合并。当前已完成 DSH Web 启动、项目 Skill 原生加载和独立子 Agent 的只读运行验证；真实项目从编码到提交的完整写入交付链仍需在实际项目中验证。

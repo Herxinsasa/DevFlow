@@ -25,7 +25,7 @@ description: 处理用户报告的 Bug 或开发中自动发现的失败。先�
 
 实际修改代码前，按总控的冲突确认与优先级规则加载用户注入约束、项目根 `AGENTS.md` 或 `CLAUDE.md`、项目/模块规范、目标目录既有一致风格，以及解析后的 `coding`、`logging` 领域约束（无配置时使用 `.devflow/constraints/` 默认基线）。已有上下文可以复用，但不能因进入 Bug 修复而省略编码约束。
 
-根因未知、跨模块或运行时复杂问题才使用独立调试 Agent；普通局部失败不重复创建 Agent。
+根因未知、跨模块或运行时复杂问题才通过 `subagent` 启动独立调试子 Agent；该调试 Agent 不属于 `code-reviewer`、`doc-reviewer`、`implementer` 三个角色 Skill，无需加载角色 Skill。prompt 必须包含最小失败包、允许范围和输出要求，并说明子 Agent 看不到当前会话。等待完成通知并核对结果后再决定修复；普通局部失败不重复创建 Agent。
 
 ## 交付后修复批次
 

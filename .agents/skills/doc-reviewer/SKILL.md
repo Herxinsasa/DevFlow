@@ -1,9 +1,14 @@
 ---
 name: doc-reviewer
-description: 独立评审待确认的需求规格与需求设计，核对输入忠实度、REQ/AC 覆盖和设计一致性。只返回有证据的问题，不修改文档或替用户决定业务取舍。
+description: 独立评审待确认的需求规格与需求设计；仅供独立子 Agent 加载，主 Agent 不得直接加载。核对输入忠实度、REQ/AC 覆盖和设计一致性。只返回有证据的问题，不修改文档或替用户决定业务取舍。
+user-invocable: false
 ---
 
 # Doc Reviewer - 需求与设计对齐评审
+
+## 运行方式
+
+本 Skill 由主 Agent 通过 `subagent` 启动的独立子 Agent 加载执行；子 Agent 先调用 `skill` 加载本 Skill。主 Agent 不得直接在当前上下文加载本 Skill 代替独立评审。子 Agent 看不到父会话，用户原始输入、已确认补充、草稿路径、Tier、证据限制和评审范围由派发 prompt 提供。完成后只返回 `通过 / 需修正 / 待用户决定` 和问题清单，不修改文件、不推进阶段、不写事实源。frontmatter 的 `user-invocable: false` 只隐藏用户 `/name` 调用，不阻止模型加载，主 Agent 仍须遵守本条；本角色子 Agent 处于委派深度 1，不再嵌套派发。
 
 ## 职责
 

@@ -18,8 +18,9 @@ DevFlow 用文件化事实约束 AI 完成项目迭代：需求不偏移、影�
 ### 跨 Harness 调度约定
 
 - 项目根 `AGENTS.md` 是总控入口；按当前 Harness 的机制加载 `.agents/skills/<名称>/SKILL.md`，模板相对各 Skill 的 `references/` 读取。
-- `doc-reviewer`、`code-reviewer`、`implementer` 是角色 Skill。需要独立评审或实现时，主 Agent 启动全新独立上下文的子 Agent，指定角色 Skill、当前事实、范围和输出要求；子 Agent 先读取角色 Skill 再执行。DSH 使用 `subagent`，不使用继承父会话的 `subagent_fork`；Codex 使用当前可用的子 Agent 能力。
-- 子 Agent 或角色文件不可用时按原门禁报告阻塞，不由主 Agent 冒充独立结论。子 Agent 的完成通知和产物必须由主 Agent 核对后写入事实源。
+- `doc-reviewer`、`code-reviewer`、`implementer` 是角色 Skill，不是 DSH Agent 预设。需要独立评审或实现时，主 Agent 必须启动全新独立上下文的子 Agent，并在 prompt 第一句要求子 Agent 先加载对应角色 Skill；主 Agent 不得直接加载角色 Skill 代替独立结论。角色 Skill 的 `user-invocable: false` 只影响用户 `/name` 调用，不阻止模型加载，独立约束仍靠本条约定。
+- DSH 使用 `subagent`，不使用继承父会话的 `subagent_fork`。DSH 的 `subagent` 没有 `subagent_type`，角色只能由 prompt 指定；子 Agent 看不到父会话，派发时必须把已确认上游事实、变更或审查范围、允许/禁止范围和输出要求写入 prompt；需求/文档评审传用户原始输入，代码/设计评审传已确认需求、设计、影响面等上游事实，不要把无关历史塞入上下文。子 Agent 结果通过完成通知返回，主 Agent 必须等待并核对后才能写凭据、更新事实源或进入下一阶段；同一子 Agent 连续执行用 `send_message` 续用，不重复新建。
+- 子 Agent 或角色 Skill 不可用时按原门禁报告阻塞，不由主 Agent 冒充独立结论。子 Agent 的完成通知和产物必须由主 Agent 核对后写入事实源。DSH 默认委派深度为 1，角色子 Agent 不再嵌套派发；Codex 使用当前可用的子 Agent 能力。
 - 安装脚本尚未适配；Git 项目可手动配置 `.devflow/hooks` 为 `core.hooksPath`，在提交前兜底检查审查与构建凭据。未配置 hooks、SVN 或无版本控制时，仍由总控和对应 Skill 执行同等交付门禁。
 
 ## 工作入口
@@ -144,7 +145,7 @@ T2/T3: spec-analyzer -> 第一次确认
 
 - 产品需求不清楚时调用 `spec-analyzer`；需求规格未确认时不进入影响面。技术改造直接由 `impact-analyzer` 核对目标、不变边界与验证基线；缺少会改变方向的事实时先澄清，不生成需求规格或专用技术基线。
 - 需求已确认但范围未知时调用 `impact-analyzer`；链路未闭合、存在编码阻塞或 T2/T3 独立影响面未确认时，不进入 UI、详细设计或计划。
-- 需求规格草稿在原需求确认门前、需求设计及按需概要设计/接口契约草稿在原设计确认门前，调用独立 `doc-reviewer`；先修正遗漏和偏移，再提交用户确认。评审不可用或证据不足时明确报告，不自行写“已通过”。
+- 需求规格草稿在原需求确认门前、需求设计及按需概要设计/接口契约草稿在原设计确认门前，通过 `subagent` 派发独立 `doc-reviewer`；先修正遗漏和偏移，再提交用户确认。评审不可用或证据不足时明确报告，不自行写“已通过”。
 - 新增页面，或布局、视觉层级、组件形态、交互路径需要直观确认时调用 `ui-designer`；产物确认前不进入详细设计、计划或 UI 编码。简单字段、文案、显隐规则或明确复用既有页面时可跳过，但实现仍须读取现有 UI 基线。
 - 影响面已确认且需要详设时调用 `design-writer`；技术契约和关键运行时约束未确认时不进入计划。
 - 入口给出增强节点初步建议，影响分析后确定概要设计、接口契约、公开声明先审与测试设计等节点的启用或跳过依据；最终决定写入开发计划，T0 无计划时写入需求规格或当前结果。跳过节点仍须有风险对应的验证。公开声明先审只用于独立消费方或高风险公共类型；被选中时先产出头文件/IDL 等声明草案并交用户评审，通过后才继续转换、后端和 UI，普通 REST 变更不加此门。
