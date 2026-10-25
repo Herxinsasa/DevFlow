@@ -142,7 +142,7 @@ docs/
 | 文档 | 存放位置 | 模板 |
 |------|---------|------|
 | 需求规格（按需求迭代） | `docs/02-需求/<迭代ID>-需求规格.md` | `.claude/skills/spec-analyzer/references/需求规格_模板.md` |
-| 影响面分析（T2/T3） | `docs/02-需求/<迭代ID>-影响面分析.md` | `.claude/skills/impact-analyzer/SKILL.md` 内输出模板 |
+| 影响面分析（T2/T3） | `docs/02-需求/<迭代ID>-影响面分析.md` | `.claude/skills/impact-analyzer/references/影响面分析_模板.md` |
 | UI 原型/界面稿（按需） | `docs/05-UI/原型/<迭代ID>/` | `.claude/skills/ui-designer/SKILL.md` |
 | 需求设计（按需求迭代） | `docs/04-设计/需求设计/<迭代ID>-需求设计.md` | `.claude/skills/design-writer/references/需求设计_模板.md` |
 | 架构总览（长期） | `docs/01-总览/架构总览.md`、`projects/*/docs/01-总览/架构总览.md` | `.claude/skills/design-writer/references/软件架构_模板.md` |

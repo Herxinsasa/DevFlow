@@ -170,6 +170,16 @@ class DevFlowHookScopeTests(unittest.TestCase):
         dirty = self.run_build_tool("verify-clean", "--root", str(self.repo / "tool"))
         self.assertEqual(dirty.returncode, 11, dirty.stderr)
 
+    def test_doc_only_commit_with_unstaged_code_is_not_blocked(self) -> None:
+        self.write(self.repo / "doc.md", "# doc\n")
+        self.git("add", "doc.md")
+        self.write(self.repo / "root.py", "ROOT = 9\n")
+
+        result = self.run_root_build_hook()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("No staged code requires a build check", result.stdout)
+        self.assertNotIn("unstaged code changes", result.stdout)
+
     def test_nested_claude_code_is_not_product_code(self) -> None:
         workflow_code = self.repo / "tool" / ".claude" / "local.py"
         self.write(workflow_code, "VALUE = 1\n")

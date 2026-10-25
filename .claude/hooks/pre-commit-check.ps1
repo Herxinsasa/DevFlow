@@ -13,8 +13,13 @@ if ($LASTEXITCODE -ne 0) {
   Write-Host "[pre-commit] Unable to assign staged code to DevFlow projects."
   exit 1
 }
+$scopeText = ($scopeJson -join "`n").Trim()
+if (-not $scopeText -or $scopeText -eq "[]") {
+  Write-Host "[pre-commit] No staged code requires a build check."
+  exit 0
+}
 try {
-  $scopes = @($scopeJson | ConvertFrom-Json)
+  $scopes = @($scopeText | ConvertFrom-Json)
 } catch {
   Write-Host "[pre-commit] Invalid project scope data from build credential tool."
   exit 1

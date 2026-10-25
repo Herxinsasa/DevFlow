@@ -11,6 +11,13 @@ from pathlib import Path
 UTF8_BOM = b"\xef\xbb\xbf"
 
 
+def force_utf8_output() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
 def read_text(path: Path, encoding: str) -> tuple[str, bool, bytes]:
     content = path.read_bytes()
     has_bom = content.startswith(UTF8_BOM)
@@ -74,6 +81,7 @@ def within(root: Path, value: str) -> Path:
 
 
 def main() -> int:
+    force_utf8_output()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--file", required=True)
