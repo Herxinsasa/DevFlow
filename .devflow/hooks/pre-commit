@@ -1,0 +1,18 @@
+#!/bin/sh
+hook_dir="${0%/*}"
+if command -v pwsh >/dev/null 2>&1; then
+  powershell_cmd=pwsh
+elif command -v powershell.exe >/dev/null 2>&1; then
+  powershell_cmd=powershell.exe
+else
+  echo "[pre-commit] PowerShell is required for DevFlow checks." >&2
+  exit 1
+fi
+
+"$powershell_cmd" -NoProfile -ExecutionPolicy Bypass -File "$hook_dir/review-check.ps1"
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
+"$powershell_cmd" -NoProfile -ExecutionPolicy Bypass -File "$hook_dir/pre-commit-check.ps1"
+exit $?

@@ -1,23 +1,21 @@
-# DevFlow 1.2.0
+# DevFlow 1.2.0 — shared
 
-DevFlow 是一套安装到现有项目目录中的 Claude Code 开发工作流，用于让 AI 面向日常迭代稳定完成开发：不偏离需求、不遗漏影响面、不过度开发，并能在中断后继续执行。项目可以使用 Git、SVN，也可以暂时不使用版本控制。
+本目录基于 DevFlow `1.2.0` 的现有流程，使用 Codex 与 DeepSeek Harness（DSH）共同支持的项目入口：根目录 `AGENTS.md` 和 `.agents/skills/`。需求、设计、TDD、Bug 批次、审查与验证门禁沿用原版。安装脚本尚未适配；Git 提交前 hook 已提供手动启用方式。
 
-核心用法：
+## 使用范围
 
-```text
-python scripts/devflow.py install --target "F:\Dev\TargetProject"
-重启 Claude Code，使自定义 Skill、子 Agent 和 hooks 生效
-Claude 会先恢复状态，并主动汇报当前迭代与下一步
-```
+将本目录放在项目根使用。两种 Harness 都读取项目根 `AGENTS.md` 并发现 `.agents/skills/`；独立评审和实现由主 Agent 启动全新子 Agent，加载对应角色 Skill。合并到现有项目时，先合并已有 `AGENTS.md` 与同名 Skill，保留已有项目状态和约束，避免覆盖用户规则。
 
-Claude Code 会自动加载根目录 `CLAUDE.md` 与 `.claude/CLAUDE.md`，安装后重启即可生效。完整调度规则在 `.claude/CLAUDE.md`，本文档面向人类快速理解。
+在 DSH Web 中，还需把该项目根目录登记并选为当前工作区；仅从该目录运行 `npx @deepseek-ai/dsh web` 不等于选中了项目工作区。若仍处于“默认工作区”，DSH 的原生 `skill` 工具不会发现项目内 `.agents/skills/`，会报告 Skill 不存在。
+
+`.devflow/` 仅是 DevFlow 自有的约束、脚本和状态目录，并非任何 Harness 的官方目录。当前需手动维护 `.devflow/progress.json`，并执行提交前审查、构建和验证门禁；Git hook 仅在手动配置后对提交时的审查与构建提供兜底。
 
 ---
 
 ## 一句话定位
 
 ```text
-按需求规格确认事实、按影响面锁定范围；用 T0-T3 分级控制流程深度，用开发计划逐任务执行，用独立子 Agent 控制编码与审查，用指纹凭据守住提交门禁。
+按需求规格确认事实、按影响面锁定范围；用 T0-T3 分级控制流程深度，用开发计划逐任务执行，用独立子 Agent 控制编码与审查，提交前核对指纹凭据。
 ```
 
 ## 工作流特点
@@ -50,16 +48,13 @@ DevFlow 不替代项目管理平台、产品决策和人工验收。一次性脚
 
 | 组成 | 用途 |
 |---|---|
-| `.claude/CLAUDE.md` | 调度入口、等级判断、阶段流转和恢复规则 |
-| `.claude/skills/` | 需求、影响面、UI、设计、计划、编码、审查、测试和提交流程 |
-| `.claude/agents/` | 独立文档评审、编码与代码审查 Agent |
-| `.claude/constraints/` | 默认编码、日志、文档和目录规范；可增加项目约束 |
-| `.claude/progress.json` | 当前迭代、任务、阻塞和待办输入 |
-| `.claude/hooks/` | 提交前审查覆盖与构建检查 |
-| `.claude/scripts/` | 项目模板/约束解析与修改文件的编码检查 |
-| `scripts/devflow.py` | 安装、检查和升级 DevFlow |
+| `AGENTS.md` | 调度入口、等级判断、阶段流转和恢复规则 |
+| `.agents/skills/` | 需求、影响面、UI、设计、计划、编码、审查、测试和提交流程 |
+| `.devflow/constraints/` | 默认编码、日志、文档和目录规范；可增加项目约束 |
+| `.devflow/progress.json` | 当前迭代、任务、阻塞和待办输入 |
+| `.devflow/scripts/` | 项目模板/约束解析与修改文件的编码检查 |
 
-需求、设计、计划和测试文档生成在目标项目的 `docs/` 中，不由升级工具覆盖。
+需求、设计、计划和测试文档生成在目标项目的 `docs/` 中；更新本适配版时应保留这些项目产物。
 
 各类事实分别维护：需求规格保存业务预期，影响面保存真实范围，详细设计保存技术契约，开发计划保存任务与验证当前状态，审查和构建凭据证明最终代码质量，`progress.json` 只负责恢复导航。UI 原型按需写入 `docs/05-UI/原型/<迭代ID>/`。
 
@@ -202,114 +197,34 @@ flowchart TB
 
 **只读处理**用于咨询、评估和排查，不启动迭代；用户要求实施后再选择相应入口。
 
-## 安装
+## 目录与定制
 
-要求 Python 3.10+。安装器会自动识别目标目录是 Git、SVN 还是无版本控制项目，不会初始化或转换版本控制。在 DevFlow 仓库中先预览，再安装：
-
-```powershell
-python scripts/devflow.py install --target "F:\Dev\TargetProject" --dry-run
-python scripts/devflow.py install --target "F:\Dev\TargetProject"
-```
-
-无人值守安装：
-
-```powershell
-python scripts/devflow.py install --target "F:\Dev\TargetProject" --yes
-```
-
-目标目录本身是普通 Git 工作树根时默认配置 `.claude/hooks`，`--dry-run` 会同时预览该配置；Git monorepo 子项目、linked worktree、SVN 和无版本控制目录自动跳过。Git 仓库根不希望修改 `core.hooksPath` 时增加 `--no-hooks`。安装器不复制 `settings.local.json`，本机工具权限继续由项目使用者自行维护。安装完成后重启 Claude Code。
-
-Git 仓库根启用 DevFlow hook 后，提交检查会按暂存文件向上匹配最近的 DevFlow 项目；嵌套项目分别使用各自的评审和构建凭据。已完整评审的文件集合允许只提交其中一部分；构建凭据必须与当前暂存文件集合及内容完全一致，暂存范围变化后需要重新构建。删除整个嵌套 DevFlow 项目时，其删除范围归入最近的存活父项目。
-
-## 升级
-
-推荐先检查，再正式升级；`check` 已经提供完整预览，不需要再机械重复一次 `update --dry-run`：
-
-```powershell
-python scripts/devflow.py check --target "F:\Dev\TargetProject"
-python scripts/devflow.py update --target "F:\Dev\TargetProject"
-```
-
-`check` 默认只显示结论和需要处理的 `ADD / UPDATE / DELETE / CONFLICT / CONFIG`，已是最新状态时只输出简短的 `[OK]` 结论；使用 `--verbose` 才显示全部 `KEEP` 文件和正常 hook 状态。
-
-自动化环境只需要预览退出码时，可直接使用 `update --dry-run`。
-
-默认升级会：
-
-- Git 项目将 `.claude` 备份到 Git 元数据目录的 `devflow-backups/`；SVN 和无版本控制项目备份到目标目录外的 `<项目名>-devflow-backups/`。可用 `--backup-dir` 统一改位置。
-- 更新未被修改的 DevFlow 文件，并清理未定制的废弃文件。
-- 保留项目定制和冲突文件，并返回退出码 `2`。
-- 迁移 `progress.json`，保留当前迭代和历史状态。
-- 保留 `.review-status.json`、`.build-status.json`、`settings.local.json` 和项目 `docs/`。
-- 仅当目标目录本身是普通 Git 工作树根时检查并设置 `core.hooksPath=.claude/hooks`；`check` 与 `update --dry-run` 对该配置使用一致的预览和退出码；Git 子项目、linked worktree 及其他模式跳过。
-- 在备份和写入任何受管文件之前校验目标 `progress.json`；非法 JSON 会在 `validate` 阶段停止，并明确报告文件、行列和“未修改文件”。
-
-安装或升级失败时，输出统一的 `[FAILED]` 结果块，包含失败阶段、目标目录、原因、文件是否可能已变化、已创建的备份路径和恢复建议。升级已完成文件更新但仍有定制冲突时输出 `[ATTENTION]`，不与执行失败混淆。
-
-常用参数：
-
-| 参数 | 用途 |
+| 路径 | 作用 |
 |---|---|
-| `--target PATH` | 指定目标项目目录；支持 Git、SVN 或无版本控制 |
-| `--dry-run` | 仅预览，不修改文件 |
-| `--force` | 备份后覆盖冲突的受管文件，不覆盖运行状态 |
-| `--backup-dir PATH` | 指定备份目录 |
-| `--yes` | 跳过交互确认 |
-| `--verbose` | 显示未变化文件 |
-| `--no-hooks` | Git 项目不检查或配置 `core.hooksPath` |
+| `AGENTS.md` | 两种 Harness 均支持的项目级调度入口 |
+| `.agents/skills/` | 两种 Harness 均支持的项目技能目录，含流程 Skill、三个角色 Skill 及模板 |
+| `.devflow/constraints/` | DevFlow 默认约束及用户新增约束 |
+| `.devflow/progress.json` | DevFlow 当前迭代导航与恢复状态 |
+| `.devflow/scripts/` | DevFlow 模板/约束解析和文件编码检查 |
+| `.devflow/hooks/` | Git 提交前审查和构建检查 |
+| `.devflow/document-policy.md` | 文档编写时按需加载的总控规则 |
 
-查看完整帮助：
+跨 Codex 与 DSH 的项目推荐使用 `AGENTS.md` + `.agents/skills/<技能>/SKILL.md`。这是两边官方文档共同支持的交集：Codex 将 `.agents/skills/` 作为仓库 Skill 路径，DSH 同时扫描 `.dsh/skills/` 与 `.agents/skills/`。三个角色 Skill 须由独立子 Agent 加载，它们不是 DSH Agent 预设；具体启动工具按所用 Harness 选择。
 
-```powershell
-python scripts/devflow.py --help
-python scripts/devflow.py install --help
-python scripts/devflow.py check --help
-python scripts/devflow.py update --help
-```
 
-## 项目模板与约束定制
+官方依据：[Codex 项目自定义说明](https://learn.chatgpt.com/docs/customization/overview)、[Codex Skill 发现路径](https://learn.chatgpt.com/docs/build-skills)、[DSH Skill 发现顺序](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/skills.md)、[DSH 项目指令加载](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/context/agent-instructions/README.md)。这里的“推荐”是依据两边官方支持路径得出的跨工具选择，并非 DSH 官方单独指定的首选路径。
 
-最直接的定制方式是保留原路径，编辑或替换 `.claude/skills/*/references/` 下的模板和 `.claude/constraints/` 下的默认约束。例如直接修改 `需求规格_模板.md`，下次生成需求规格就读取修改后的内容；可调整章节和措辞，但要保留 `REQ-`、`AC-`、来源、状态等追溯语义，或提供经确认的等价表示。新增约束写成 `.claude/constraints/` 下的 Markdown 文件；DevFlow 启动时扫描文件清单，按标题和适用范围在相关阶段加载。新文件范围不明或与现有规则冲突时会说明来源与影响，请用户确认；确认后在适用范围内优先使用注入文档。
+替换默认模板时，直接修改 `.agents/skills/<技能>/references/` 下的对应文件；新增约束放入 `.devflow/constraints/`。若模板或约束放在这些目录之外，可在项目根配置 `devflow.project.json`，解析规则见 `AGENTS.md` 与 `.devflow/document-policy.md`。发生实质冲突时由用户确认。
 
-```powershell
-python .claude/scripts/project_config.py --root . scan
-```
+## Git 提交前门禁
 
-直接修改的默认模板或约束属于受管文件，升级预览会标为冲突并保留，随后需人工合并新版规则。希望定制文件不受升级冲突影响时，可在目标项目根使用可选的 `devflow.project.json` 指向项目自有文件：
+本目录提供与 Codex、DSH 无关的 Git `pre-commit` hook。它在**提交时**检查暂存产品代码是否有覆盖该内容的独立审查凭据，并复用匹配当前暂存范围的构建凭据；缺失时按项目构建入口构建并记录。联调 Bug 批次中的每项修复只做针对性验证，下一版本交付或用户要求提交前才统一审查与构建。工作流本身仍负责验收状态、测试结果和用户提交授权；Git hook 不代替这些判断。
 
-```json
-{
-  "templates": {
-    "requirement_spec": "docs/devflow/templates/spec.md"
-  },
-  "constraints": {
-    "coding": {"mode": "extend", "path": "docs/devflow/rules/coding.md"}
-  }
-}
-```
-
-模板键：`requirement_spec`、`impact_analysis`、`requirement_design`、`overview_design`、`interface_contract`、`module_design`、`architecture`、`development_plan`、`repair_batch`、`code_review`。约束键：`coding`、`logging`、`document`、`directory`。模板路径直接替换该类默认模板；约束的 `extend` 先读默认文件再读项目文件，`replace` 仅读项目文件。路径使用项目内相对路径和 `/`，文件放在受管 `.claude` 外；配置和引用文件不会被 DevFlow 升级覆盖。`replace` 不取消用户确认、证据真实性和提交授权门禁。
+在普通 Git 工作树根目录使用，并确认没有需要保留的其他 `core.hooksPath` 后，手动启用：
 
 ```powershell
-python .claude/scripts/project_config.py --root . validate
-python .claude/scripts/project_config.py --root . resolve --kind template --name requirement_spec
+git config --local core.hooksPath .devflow/hooks
+git config --local --get core.hooksPath
 ```
 
-同路径替换和配置指向的模板应保留稳定 ID、来源或关联、状态及追溯语义；若改用等价结构，由用户确认后按该结构生成。`validate` 汇总配置警告，`scan` 不依赖配置，`resolve` 只校验当前使用项：无关错误不阻断当前节点；当前文件不可读取时只暂停该产物并提示用户修正或选择；可读取但缺少预期锚点时提示用户确认语义，不自动换回默认模板。提交授权、证据真实性和原确认门保持有效。未配置的项目沿用同路径文件。升级完成后需要重启 Claude Code。
-
-## 手动升级
-
-没有 Python 环境时，先备份目标项目 `.claude`，再按下表拷贝：
-
-| 处理方式 | 文件 |
-|---|---|
-| 确认未定制后替换 | `.claude/CLAUDE.md`、`.claude/.gitignore`，以及 `agents/`、`skills/`、`hooks/`、`scripts/` 中 DevFlow 提供的同名文件；已改动的受管文件先保留并人工合并，保留项目额外文件 |
-| 比较后替换 | `.claude/constraints/`；未做项目定制可直接替换，已定制则保留并合并新规则 |
-| 必须保留 | `.claude/progress.json`、`.claude/settings.local.json`、`.claude/.review-status.json`、`.claude/.build-status.json`、项目根 `CLAUDE.md`、`devflow.project.json` 及其引用文件和 `docs/` |
-| 删除旧文件 | `.claude/skills/design-maker/SKILL.md`、`.claude/skills/ui-designer/references/qt-frontend.md`、`.claude/skills/ui-designer/references/web-frontend.md`；界面设计能力由新版 `ui-designer` 提供 |
-
-`pre-commit-check.ps1` 使用新文件同名覆盖，不保留版本后缀脚本。Git 项目可执行 `git config core.hooksPath .claude/hooks`；SVN 和无版本控制项目跳过此步。最后重启 Claude Code。
-
-手动合并和状态迁移完成后再更新 `.claude/devflow-version.json`；直接复制新版清单不会证明目标项目的受管文件已经更新。
-
-除非明确不需要项目定制和历史状态，不建议直接覆盖整个 `.claude`。日常升级优先使用 `devflow.py update`，手动拷贝仅作为兜底方式。
+已有 hook 路径时先合并原有 hook，不要直接覆盖配置。Windows 使用 `powershell.exe`，其他系统需要 `pwsh`。未配置 Git hook、SVN 和无版本控制项目仍由 `code-committer` 按相同门禁检查。安装/升级脚本尚未适配；本目录也没有 DSH 运行时端到端实测记录。
