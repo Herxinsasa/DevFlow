@@ -253,10 +253,15 @@ def migrate_progress(source: Path, target: Path) -> Change:
     merged = dict(src_data)
     for key in (
         "current_iteration", "current_requirement_input", "current_skill", "current_step",
-        "status", "documents", "current_task", "iteration_history",
+        "status", "current_task", "iteration_history",
     ):
         if key in old:
             merged[key] = old[key]
+    old_documents = old.get("documents")
+    if isinstance(old_documents, dict):
+        merged["documents"] = {**src_data["documents"], **old_documents}
+    elif "documents" in old:
+        merged["documents"] = old_documents
     current_skill = merged.get("current_skill")
     if isinstance(current_skill, str) and current_skill in SKILL_ALIASES:
         merged["current_skill"] = SKILL_ALIASES[current_skill]

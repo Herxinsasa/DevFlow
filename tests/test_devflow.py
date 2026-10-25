@@ -92,6 +92,96 @@ class DevFlowInstallerTests(unittest.TestCase):
         self.assertNotIn("design-maker", migrated["milestones"])
         self.assertIn("ui-designer", migrated["milestones"])
 
+    def test_progress_adds_optional_repair_batch_without_losing_documents(self) -> None:
+        target = self.base / "old-progress"
+        (target / ".claude").mkdir(parents=True)
+        (target / ".claude" / "progress.json").write_text(
+            json.dumps({
+                "current_iteration": "iter-001",
+                "documents": {
+                    "development_plan": "docs/08-计划/iter-001-开发计划.md",
+                    "custom_reference": "docs/local.md",
+                },
+                "iteration_history": [{"id": "iter-000", "status": "completed"}],
+            }),
+            encoding="utf-8",
+        )
+
+        devflow.migrate_progress(ROOT, target)
+        migrated = json.loads(
+            (target / ".claude" / "progress.json").read_text(encoding="utf-8")
+        )
+        self.assertIsNone(migrated["documents"]["repair_batch"])
+        self.assertEqual(
+            migrated["documents"]["development_plan"],
+            "docs/08-计划/iter-001-开发计划.md",
+        )
+        self.assertEqual(migrated["documents"]["custom_reference"], "docs/local.md")
+        self.assertEqual(migrated["current_iteration"], "iter-001")
+        self.assertEqual(migrated["iteration_history"], [{"id": "iter-000", "status": "completed"}])
+
+        migrated["documents"]["repair_batch"] = "docs/06-测试/v1-fix-001-修复批次.md"
+        (target / ".claude" / "progress.json").write_text(
+            json.dumps(migrated), encoding="utf-8"
+        )
+        devflow.migrate_progress(ROOT, target)
+        restored = json.loads(
+            (target / ".claude" / "progress.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            restored["documents"]["repair_batch"],
+            "docs/06-测试/v1-fix-001-修复批次.md",
+        )
+
+    def test_update_preserves_project_config_active_batch_and_modified_managed_template(self) -> None:
+        target = self.base / "custom-project"
+        target.mkdir()
+        installed = self.run_cli("install", "--target", str(target), "--yes", "--no-hooks")
+        self.assertEqual(installed.returncode, 0, installed.stdout + installed.stderr)
+
+        (target / "templates").mkdir()
+        custom_template = target / "templates/spec.md"
+        custom_template.write_text("状态 来源 REQ-001 AC-001", encoding="utf-8")
+        project_config = target / "devflow.project.json"
+        project_config.write_text(
+            json.dumps({"templates": {"requirement_spec": "templates/spec.md"}}),
+            encoding="utf-8",
+        )
+        progress_path = target / ".claude/progress.json"
+        progress = json.loads(progress_path.read_text(encoding="utf-8"))
+        progress["current_iteration"] = "v1-fix-001"
+        progress["status"] = "in_progress"
+        progress["documents"]["repair_batch"] = "docs/06-测试/v1-fix-001-修复批次.md"
+        progress_path.write_text(json.dumps(progress), encoding="utf-8")
+
+        managed_template = target / ".claude/skills/spec-analyzer/references/需求规格_模板.md"
+        managed_template.write_text(
+            managed_template.read_text(encoding="utf-8") + "\nlocal edit\n",
+            encoding="utf-8",
+        )
+        preview = self.run_cli("update", "--target", str(target), "--dry-run", "--no-hooks")
+        self.assertEqual(preview.returncode, 2, preview.stdout + preview.stderr)
+        self.assertIn("CONFLICT", preview.stdout)
+
+        updated = self.run_cli("update", "--target", str(target), "--yes", "--no-hooks")
+        self.assertEqual(updated.returncode, 2, updated.stdout + updated.stderr)
+        self.assertIn("local edit", managed_template.read_text(encoding="utf-8"))
+        self.assertEqual(json.loads(project_config.read_text(encoding="utf-8"))["templates"]["requirement_spec"], "templates/spec.md")
+        self.assertEqual(custom_template.read_text(encoding="utf-8"), "状态 来源 REQ-001 AC-001")
+        restored = json.loads(progress_path.read_text(encoding="utf-8"))
+        self.assertEqual(restored["current_iteration"], "v1-fix-001")
+        self.assertEqual(restored["status"], "in_progress")
+        self.assertEqual(restored["documents"]["repair_batch"], "docs/06-测试/v1-fix-001-修复批次.md")
+
+        resolver = target / ".claude/scripts/project_config.py"
+        resolved = subprocess.run(
+            [sys.executable, str(resolver), "--root", str(target), "resolve", "--kind", "template", "--name", "requirement_spec"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(resolved.returncode, 0, resolved.stderr)
+        self.assertEqual(json.loads(resolved.stdout)["paths"], ["templates/spec.md"])
+
     def test_progress_removes_old_ui_skill_when_both_milestones_exist(self) -> None:
         target = self.base / "mixed-ui-skill"
         (target / ".claude").mkdir(parents=True)
