@@ -74,7 +74,7 @@ description: 按开发计划和风险等级组织编码，组装最小上下文�
 
    调用形式：`python .claude/scripts/check-source-file.py --root <项目根> --file <相对路径> --encoding <目标编码> --bom require|forbid --eol lf|crlf [--baseline <编辑前快照> --baseline-encoding <原编码>]`。文件与配置先由当前任务事实确定；脚本不猜编码或自动改写文件。
 6. 按下方返回状态做任务级对齐和路由；可修复偏差只针对同一任务重新派发，`NEEDS_CONTEXT` 或 `BLOCKED` 不得标记完成。
-7. 写回状态、主要修改文件、短变更摘要、局部检查、风险或阻塞原因，随后选择下一任务；只剩验证项时进入 `code-review` 和 `code-tester`。
+7. 写回状态、主要修改文件、短变更摘要、局部检查、风险或阻塞原因，随后选择下一任务；只剩验证项时进入 `code-reviewer` 和 `code-tester`。
 
 开发计划只更新当前状态和必要阻塞，不追加执行时间、Agent 名称、Agent ID 或过程日志。
 
@@ -98,7 +98,7 @@ description: 按开发计划和风险等级组织编码，组装最小上下文�
 - 局部检查结果或无法执行原因。
 - 下一任务、活动阻塞或进入独立审查的建议。
 
-关联任务完成后统一进入独立 `code-review`，不要求每个小任务单独终审。
+关联任务完成后统一进入独立 `code-reviewer`，不要求每个小任务单独终审。
 
 ## 完成前自检
 

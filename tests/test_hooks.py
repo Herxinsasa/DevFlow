@@ -73,7 +73,7 @@ class DevFlowHookScopeTests(unittest.TestCase):
         snapshot.update({
             "status": "passed",
             "conclusion": "passed",
-            "reviewer": "code-reviewer",
+            "reviewer": "reviewer",
             "scope": "full",
             "accepted_risks": [],
             "uncovered_scope": [],
@@ -131,6 +131,19 @@ class DevFlowHookScopeTests(unittest.TestCase):
         result = self.run_root_review_hook()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("1 DevFlow project", result.stdout)
+
+    def test_legacy_reviewer_marker_remains_supported(self) -> None:
+        self.write(self.repo / "root.py", "ROOT = 6\n")
+        snapshot = self.snapshot(self.repo)
+        self.write_review(self.repo, snapshot)
+        credential = self.repo / ".claude" / ".review-status.json"
+        data = json.loads(credential.read_text(encoding="utf-8"))
+        data["reviewer"] = "code-reviewer"
+        self.write(credential, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+        self.git("add", "root.py")
+
+        result = self.run_root_review_hook()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_nearest_nested_projects_require_their_own_credentials(self) -> None:
         nested = self.repo / "tool" / "plugin"

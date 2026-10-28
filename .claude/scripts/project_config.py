@@ -19,7 +19,7 @@ TEMPLATES = {
     "architecture": ".claude/skills/design-writer/references/软件架构_模板.md",
     "development_plan": ".claude/skills/dev-planner/references/开发计划_模板.md",
     "repair_batch": ".claude/skills/bug-fixer/references/修复批次_模板.md",
-    "code_review": ".claude/skills/code-review/references/代码审查报告_模板.md",
+    "code_review": ".claude/skills/code-reviewer/references/代码审查报告_模板.md",
 }
 
 CONSTRAINTS = {

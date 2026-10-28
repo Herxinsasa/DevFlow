@@ -18,6 +18,9 @@ EXCLUDED = {
     ".claude/.build-status.json",
 }
 DEPRECATED = [
+    ".claude/agents/code-reviewer.md",
+    ".claude/skills/code-review/SKILL.md",
+    ".claude/skills/code-review/references/代码审查报告_模板.md",
     ".claude/skills/design-maker/SKILL.md",
     ".claude/skills/ui-designer/references/qt-frontend.md",
     ".claude/skills/ui-designer/references/web-frontend.md",

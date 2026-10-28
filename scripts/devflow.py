@@ -22,7 +22,7 @@ STATE_FILES = {
 }
 INSTALL_SEED_FILES = {".claude/progress.json"}
 HANDLED_ERRORS = (OSError, ValueError, subprocess.CalledProcessError)
-SKILL_ALIASES = {"design-maker": "ui-designer"}
+SKILL_ALIASES = {"design-maker": "ui-designer", "code-review": "code-reviewer"}
 
 
 @dataclass

@@ -1,9 +1,9 @@
 ---
-name: code-reviewer
+name: reviewer
 description: 独立审查产品代码变更。根据实际变更集、需求与设计、源码、验证结果和调度层传入的适用项目约束，输出带证据、影响和置信度的候选问题，不直接修改文件。
 ---
 
-# Code Reviewer - 代码审查
+# Reviewer - 独立代码审查
 
 ## 定位
 
@@ -15,7 +15,7 @@ description: 独立审查产品代码变更。根据实际变更集、需求与�
 
 ## 审查输入
 
-由 `code-review` 提供：
+由 `code-reviewer` 提供：
 
 | 输入 | 用途 |
 |------|------|

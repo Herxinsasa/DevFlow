@@ -1,13 +1,13 @@
 ---
-name: code-review
-description: 产品代码审查调度。编码完成、交付前审查凭据缺失或用户要求审查时，整理实际变更集、需求与设计依据、验证结果和适用项目约束，调用独立 code-reviewer，复核并路由审查结果，生成与当前代码内容绑定的审查凭据。不用于评审 Skill、Agent、Hook 等 DevFlow 工作流控制面。
+name: code-reviewer
+description: 产品代码审查调度。编码完成、交付前审查凭据缺失或用户要求审查时，整理实际变更集、需求与设计依据、验证结果和适用项目约束，调用独立 reviewer，复核并路由审查结果，生成与当前代码内容绑定的审查凭据。不用于评审 Skill、Agent、Hook 等 DevFlow 工作流控制面。
 ---
 
-# Code Review - 代码审查调度
+# Code Reviewer - 代码审查流程
 
 ## 定位
 
-`code-review` 是产品代码交付前的独立审查控制面。它负责确定范围、整理最小充分上下文、调度 `code-reviewer`、处理返回结果和写入审查凭据；不亲自执行代码审查，也不直接修改代码。只有满足待用户验证说明预览条件时，才路由 `code-committer` 生成只读预览。
+`code-reviewer` 是产品代码交付前的独立审查控制面。它负责确定范围、整理最小充分上下文、调度 `reviewer`、处理返回结果和写入审查凭据；不亲自执行代码审查，也不直接修改代码。只有满足待用户验证说明预览条件时，才路由 `code-committer` 生成只读预览。
 
 DevFlow 的 Skill、Agent、Hook、模板和工作流说明属于工作流维护，不进入本 Skill，也不生成产品代码审查凭据。
 
@@ -21,13 +21,13 @@ DevFlow 的 Skill、Agent、Hook、模板和工作流说明属于工作流维护
 
 ## 工作原则
 
-1. **独立审查。** 使用新的 `code-reviewer`，不让编码者自审冒充独立结论。
+1. **独立审查。** 使用新的 `reviewer`，不让编码者自审冒充独立结论。
 2. **事实优先。** 以实际 diff、已确认需求与设计、源码和适用项目约束为依据，不把历史讨论或 reviewer 标签直接当作事实。
 3. **范围明确。** 默认审查本次交付的全部代码差异；允许部分审查，但必须标明未覆盖范围，且不能作为最终提交凭据。
 4. **最小上下文。** 只传入判断本次改动所需的事实，不倾倒无关文档和执行流水。
 5. **问题优先。** Critical、Important 必须处理；Suggestion 只记录。涉及行为、范围、契约或验收选择时列为待确认，不代替用户决策。
 
-所有产品代码交付都需要独立审查。`code-reviewer` 不可用时不得写通过状态：T0/T1 可继续本地验证但不能提交，T2/T3 停止交付并通知用户。
+所有产品代码交付都需要独立审查。`reviewer` 不可用时不得写通过状态：T0/T1 可继续本地验证但不能提交，T2/T3 停止交付并通知用户。
 
 ## 输入
 
@@ -43,7 +43,7 @@ DevFlow 的 Skill、Agent、Hook、模板和工作流说明属于工作流维护
 
 ### Step 0：检查 reviewer
 
-确认 `code-reviewer` 可用。不可用时不得由主 Agent 模拟审查，也不得写入审查通过凭据。
+确认 `reviewer` 可用。不可用时不得由主 Agent 模拟审查，也不得写入审查通过凭据。
 
 ### Step 1：确定审查范围
 
@@ -61,7 +61,7 @@ Git 仓库包含多个 DevFlow 项目时，默认范围限定为本次待交付�
 
 ### Step 3：派发独立审查
 
-调用新的 `code-reviewer`，要求先列候选问题，按 Critical、Important、Suggestion 排序，并为每项给出文件位置、事实证据、实际影响、置信度和建议测试重点。reviewer 只输出结论，不修改文件。
+调用新的 `reviewer`，要求先列候选问题，按 Critical、Important、Suggestion 排序，并为每项给出文件位置、事实证据、实际影响、置信度和建议测试重点。reviewer 只输出结论，不修改文件。
 
 ### Step 4：复核并路由结果
 
@@ -92,7 +92,7 @@ reviewer 输出是候选结论。根据当前事实源复核问题是否成立�
 {
   "status": "passed",
   "conclusion": "passed",
-  "reviewer": "code-reviewer",
+  "reviewer": "reviewer",
   "tier": "T1",
   "scope": "full",
   "accepted_risks": [],
@@ -136,7 +136,7 @@ T2/T3 或用户要求归档时使用总控解析的 `code_review` 模板。报�
 
 在输出结论或写入凭据前检查：
 
-- 是否实际使用独立 `code-reviewer`，没有由主 Agent 模拟通过？
+- 是否实际使用独立 `reviewer`，没有由主 Agent 模拟通过？
 - 审查范围是否明确，最终凭据是否覆盖全部待交付产品代码？
 - Git 仓库存在嵌套项目时，范围是否按最近的 DevFlow 项目根限定，没有混入其他项目差异？
 - 输入是否包含判断本次改动所需的需求、设计、验证和适用约束？

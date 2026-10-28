@@ -109,7 +109,7 @@ flowchart TB
     DC -->|需修改| DESIGN
     DC -->|是| PLAN
     PLAN --> BUILD
-    BUILD --> RV["code-review<br/>最终差异审查"]
+    BUILD --> RV["code-reviewer<br/>最终差异审查"]
     RV --> TV["code-tester<br/>构建与验证"]
     TV --> UV{"用户验收或风险接受？"}
     UV --> DONE(["迭代完成"])
@@ -187,7 +187,7 @@ flowchart TB
     RETEST --> GATE{"准备下一版交付或提交？"}
     GATE -->|否| MORE(["等待同版后续反馈"])
     MORE -.-> DIAG
-    GATE -->|是| REVIEW["code-review<br/>累计最终差异审查"]
+    GATE -->|是| REVIEW["code-reviewer<br/>累计最终差异审查"]
     REVIEW --> TEST["code-tester<br/>风险匹配构建与回归"]
     TEST --> ACCEPT{"用户验收或风险接受？"}
 ```
@@ -241,6 +241,7 @@ python scripts/devflow.py update --target "F:\Dev\TargetProject"
 - 保留项目定制和冲突文件，并返回退出码 `2`。
 - 迁移 `progress.json`，保留当前迭代和历史状态。
 - 保留 `.review-status.json`、`.build-status.json`、`settings.local.json` 和项目 `docs/`。
+- 本版本将代码审查 Agent 由 `code-reviewer` 更名为 `reviewer`；升级不会覆盖 `settings.local.json`，其中若显式允许 `Agent(code-reviewer)`，需同步改为 `Agent(reviewer)`。
 - 仅当目标目录本身是普通 Git 工作树根时检查并设置 `core.hooksPath=.claude/hooks`；`check` 与 `update --dry-run` 对该配置使用一致的预览和退出码；Git 子项目、linked worktree 及其他模式跳过。
 - 在备份和写入任何受管文件之前校验目标 `progress.json`；非法 JSON 会在 `validate` 阶段停止，并明确报告文件、行列和“未修改文件”。
 

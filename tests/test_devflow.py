@@ -92,6 +92,25 @@ class DevFlowInstallerTests(unittest.TestCase):
         self.assertNotIn("design-maker", migrated["milestones"])
         self.assertIn("ui-designer", migrated["milestones"])
 
+    def test_progress_migrates_renamed_code_review_skill(self) -> None:
+        target = self.base / "renamed-review-skill"
+        (target / ".claude").mkdir(parents=True)
+        (target / ".claude" / "progress.json").write_text(
+            json.dumps({
+                "current_skill": "code-review",
+                "milestones": {"code-review": {"status": "in_progress"}},
+            }),
+            encoding="utf-8",
+        )
+
+        devflow.migrate_progress(ROOT, target)
+        migrated = json.loads(
+            (target / ".claude" / "progress.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(migrated["current_skill"], "code-reviewer")
+        self.assertNotIn("code-review", migrated["milestones"])
+        self.assertEqual(migrated["milestones"]["code-reviewer"]["status"], "in_progress")
+
     def test_progress_adds_optional_repair_batch_without_losing_documents(self) -> None:
         target = self.base / "old-progress"
         (target / ".claude").mkdir(parents=True)
@@ -215,6 +234,41 @@ class DevFlowInstallerTests(unittest.TestCase):
         managed_skill = ROOT / ".claude" / "skills" / "spec-analyzer" / "SKILL.md"
         self.assertFalse(build_manifest.is_managed_path(review_artifact))
         self.assertTrue(build_manifest.is_managed_path(managed_skill))
+
+    def test_renamed_review_files_upgrade_safely(self) -> None:
+        target = self.base / "renamed-review-files"
+        old_skill = target / ".claude" / "skills" / "code-review" / "SKILL.md"
+        old_template = old_skill.parent / "references" / "代码审查报告_模板.md"
+        old_agent = target / ".claude" / "agents" / "code-reviewer.md"
+        old_skill.parent.mkdir(parents=True)
+        old_agent.parent.mkdir(parents=True)
+        old_skill.write_text("old workflow\n", encoding="utf-8")
+        old_template.parent.mkdir(parents=True)
+        old_template.write_text("old template\n", encoding="utf-8")
+        old_agent.write_text("old agent\n", encoding="utf-8")
+        old_hashes = {
+            ".claude/skills/code-review/SKILL.md": devflow.sha256(old_skill),
+            ".claude/skills/code-review/references/代码审查报告_模板.md": devflow.sha256(old_template),
+            ".claude/agents/code-reviewer.md": devflow.sha256(old_agent),
+        }
+        (target / ".claude" / "devflow-version.json").write_text(
+            json.dumps({"version": "old", "managed_files": old_hashes}) + "\n",
+            encoding="utf-8",
+        )
+        old_agent.write_text("old agent\nproject customization\n", encoding="utf-8")
+
+        source_manifest = devflow.read_manifest(ROOT)
+        changes = devflow.classify(target, ROOT, source_manifest)
+        actions = {(change.action, change.path) for change in changes}
+
+        self.assertIn(("delete", ".claude/skills/code-review/SKILL.md"), actions)
+        self.assertIn(("delete", ".claude/skills/code-review/references/代码审查报告_模板.md"), actions)
+        self.assertIn(("conflict", ".claude/agents/code-reviewer.md"), actions)
+        self.assertIn(("add", ".claude/skills/code-reviewer/SKILL.md"), actions)
+        self.assertIn(("add", ".claude/skills/code-reviewer/references/代码审查报告_模板.md"), actions)
+        self.assertIn(("add", ".claude/agents/reviewer.md"), actions)
+        self.assertFalse((ROOT / ".claude" / "skills" / "code-review").exists())
+        self.assertFalse((ROOT / ".claude" / "agents" / "code-reviewer.md").exists())
 
     def test_explicit_svn_marker_wins_over_nested_git_detection(self) -> None:
         target = self.init_git()
