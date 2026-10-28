@@ -13,7 +13,7 @@
 ### DSH 运行前提
 
 - 选择项目根为工作区，并启用原生 `skill` 与 `subagent` 工具。DSH 没有 `subagent_type`，角色只能由 `subagent` 的 prompt 指定；prompt 第一句必须要求子 Agent 先 `skill` 加载角色 Skill，主 Agent 不得直接加载角色 Skill。
-- 三个角色 Skill 的 `user-invocable: false` 只隐藏用户 `/name` 调用，不阻止模型加载；角色隔离仍靠本条约定和独立评审流程，不能把它当成硬隔离。
+- 三个角色 Skill（`reviewer`、`doc-reviewer`、`implementer`）的 `user-invocable: false` 只隐藏用户 `/name` 调用，不阻止模型加载；角色隔离仍靠本条约定和独立评审流程，不能把它当成硬隔离。
 - 子 Agent 看不到父会话；派发时把用户原始输入、范围、基线、允许/禁止范围和输出要求写入 prompt。`subagent` 异步返回，主 Agent 必须等待完成通知并核对；同一子 Agent 用 `send_message` 续用。默认委派深度为 1，角色子 Agent 不再嵌套。
 - 会话权限需允许工作区写入、`pwsh`、`git` 和项目构建命令；构建需要网络时同时放行。DSH 的权限在会话/profile 权限预设中配置，没有项目级 `permissions.allow` 文件。
 - `AGENTS.md` 受 DSH 指令预算限制；base profile 默认 65,536 字节，实际以当前 profile 为准。合并项目自有 `AGENTS.md` 后需复核，避免末尾门禁被截断。
@@ -124,7 +124,7 @@ flowchart TB
     DC -->|需修改| DESIGN
     DC -->|是| PLAN
     PLAN --> BUILD
-    BUILD --> RV["code-review<br/>最终差异审查"]
+    BUILD --> RV["code-reviewer<br/>最终差异审查"]
     RV --> TV["code-tester<br/>构建与验证"]
     TV --> UV{"用户验收或风险接受？"}
     UV --> DONE(["迭代完成"])
@@ -202,7 +202,7 @@ flowchart TB
     RETEST --> GATE{"准备下一版交付或提交？"}
     GATE -->|否| MORE(["等待同版后续反馈"])
     MORE -.-> DIAG
-    GATE -->|是| REVIEW["code-review<br/>累计最终差异审查"]
+    GATE -->|是| REVIEW["code-reviewer<br/>累计最终差异审查"]
     REVIEW --> TEST["code-tester<br/>风险匹配构建与回归"]
     TEST --> ACCEPT{"用户验收或风险接受？"}
 ```
@@ -230,7 +230,7 @@ flowchart TB
 | `.devflow/document-policy.md` | 文档编写时按需加载的总控规则 |
 | `tests/` | DSH 适配与入口一致性回归测试 |
 
-跨 Codex 与 DSH 的项目推荐使用 `AGENTS.md` + `.agents/skills/<技能>/SKILL.md`。这是两边官方文档共同支持的交集：Codex 将 `.agents/skills/` 作为仓库 Skill 路径，DSH 同时扫描 `.dsh/skills/` 与 `.agents/skills/`。三个角色 Skill 须由独立子 Agent 加载，它们不是 DSH Agent 预设；DSH 没有 `subagent_type`，具体启动工具按所用 Harness 选择。
+跨 Codex 与 DSH 的项目推荐使用 `AGENTS.md` + `.agents/skills/<技能>/SKILL.md`。这是两边官方文档共同支持的交集：Codex 将 `.agents/skills/` 作为仓库 Skill 路径，DSH 同时扫描 `.dsh/skills/` 与 `.agents/skills/`。三个角色 Skill（`reviewer`、`doc-reviewer`、`implementer`）须由独立子 Agent 加载，它们不是 DSH Agent 预设；DSH 没有 `subagent_type`，具体启动工具按所用 Harness 选择。
 
 
 官方依据：[Codex 项目自定义说明](https://learn.chatgpt.com/docs/customization/overview)、[Codex Skill 发现路径](https://learn.chatgpt.com/docs/build-skills)、[DSH Skill 发现顺序](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/skills.md)、[DSH 项目指令加载](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/context/agent-instructions/README.md)。这里的“推荐”是依据两边官方支持路径得出的跨工具选择，并非 DSH 官方单独指定的首选路径。

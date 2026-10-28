@@ -1,23 +1,24 @@
 DevFlow 1.2.0-shared 修订记录
 
-修订日期：2026-10-25
+修订日期：2026-10-28
 
 新增
 
-- 增加 DSH 角色 Skill 派发约定：`code-reviewer`、`doc-reviewer`、`implementer` 由 `subagent` 启动的独立子 Agent 先通过 `skill` 加载，主 Agent 不得直接加载代替独立结论。
+- 增加 DSH 角色 Skill 派发约定：`reviewer`、`doc-reviewer`、`implementer` 由 `subagent` 启动的独立子 Agent 先通过 `skill` 加载，主 Agent 不得直接加载代替独立结论。
 - 增加 DSH 运行前提、角色派发 prompt 模板、权限/沙箱要求和手动安装/升级说明。
 - 新增 `tests/test_dsh_adaptation.py`，覆盖角色 Skill 格式、`subagent` 派发、异步等待、输入传递、`send_message` 续用和模板解析等适配不变量。
 
 修改
 
+- 统一代码评审命名：对外完整流程 Skill 由 `code-review` 调整为 `code-reviewer`，内部独立评审角色由 `code-reviewer` 调整为 `reviewer`，并同步调度、模板、门禁、README 和适配测试；门禁继续接受旧版 `code-reviewer` 凭据标识。
 - `AGENTS.md` 跨 Harness 约定补充异步等待、输入传递、`send_message` 续用、默认深度 1 和 `user-invocable` 边界。
-- `code-review`、`dev-builder`、`spec-analyzer`、`design-writer` 明确通过 `subagent` 派发角色、prompt 要求子 Agent 先加载角色 Skill、等待完成通知后再写凭据或推进。
-- `code-reviewer`、`doc-reviewer`、`implementer` 增加运行方式、`user-invocable: false` 和“主 Agent 不得直接加载”说明；该字段只隐藏用户 `/name` 调用，不阻止模型加载。
+- `code-reviewer`、`dev-builder`、`spec-analyzer`、`design-writer` 明确通过 `subagent` 派发角色、prompt 要求子 Agent 先加载角色 Skill、等待完成通知后再写凭据或推进。
+- `reviewer`、`doc-reviewer`、`implementer` 增加运行方式、`user-invocable: false` 和“主 Agent 不得直接加载”说明；该字段只隐藏用户 `/name` 调用，不阻止模型加载。
 - `test-designer`、`bug-fixer` 补充角色/调试子 Agent 的派发说明；`dev-builder` 移除未定义的 `BLOCKED_AGENT_UNAVAILABLE`，改为阻塞并注明子 Agent 不可用。
 - README 区分 T0/简单 T1 可由主 Agent 直接编码与 T2/T3 必须派发独立 implementer，并补充 DSH 入口和提交门禁说明。
 
 验证
 
-- DSH 子 Agent 实测可加载 `implementer` 和 `code-reviewer`。
+- 自动适配测试验证 `implementer`、`reviewer` 角色 Skill 的目录、frontmatter 与派发约束。
 - `python -m unittest discover -v`：9 项测试通过。
 - `project_config.py validate`、`check-source-file.py` 和 `git diff --check` 通过。

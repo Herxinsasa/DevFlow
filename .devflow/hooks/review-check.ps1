@@ -217,7 +217,7 @@ foreach ($key in $groups.Keys) {
     (@("passed", "conditional_pass") -contains [string]$reviewData.status) -or
     (@("passed", "conditional") -contains [string]$reviewData.conclusion)
   if (-not $validConclusion -or (@("failed", "不通过") -contains [string]$reviewData.conclusion)) {
-    $scopeFailures += "latest code-review did not pass"
+    $scopeFailures += "latest code-reviewer did not pass"
   }
   $reviewScope = if ($reviewData.scope -ne $null) { [string]$reviewData.scope } else { [string]$reviewData.review_scope }
   if ($reviewScope -ne "full") { $scopeFailures += "latest review is incomplete" }
@@ -230,7 +230,7 @@ foreach ($key in $groups.Keys) {
     $scopeFailures += "conditional review has no accepted risk record"
   }
   $reviewer = if ($reviewData.reviewer) { [string]$reviewData.reviewer } else { [string]$reviewData.review_agent_name }
-  if ($reviewer -ne "code-reviewer") { $scopeFailures += "independent code-reviewer marker is missing" }
+  if (@("reviewer", "code-reviewer") -notcontains $reviewer) { $scopeFailures += "independent reviewer marker is missing" }
   $credentialRoot = if ($reviewData.project_root) { Normalize-Path ([string]$reviewData.project_root) } else { $null }
   if ($credentialRoot -and $credentialRoot -ne $key) { $scopeFailures += "credential project_root does not match this project" }
 
@@ -253,7 +253,7 @@ foreach ($key in $groups.Keys) {
 if ($allFailures.Count -gt 0) {
   Write-Host "[pre-commit] Code review check failed:"
   $allFailures | ForEach-Object { Write-Host "  - $_" }
-  Write-Host "[pre-commit] Run code-review for each affected DevFlow project before committing."
+  Write-Host "[pre-commit] Run code-reviewer for each affected DevFlow project before committing."
   exit 1
 }
 

@@ -12,8 +12,8 @@ SKILLS = ROOT / ".agents" / "skills"
 REQUIRED_SKILLS = {
     "bug-fixer",
     "code-committer",
-    "code-review",
     "code-reviewer",
+    "reviewer",
     "code-tester",
     "design-writer",
     "dev-builder",
@@ -26,7 +26,7 @@ REQUIRED_SKILLS = {
     "ui-designer",
 }
 WORKFLOW_REQUIRED = {
-    "code-review": (
+    "code-reviewer": (
         "prompt 第一句",
         "先调用 `skill` 加载",
         "等待子 Agent 完成通知",
@@ -58,7 +58,7 @@ WORKFLOW_REQUIRED = {
         "主 Agent 不得直接加载",
     ),
 }
-ROLE_SKILLS = {"code-reviewer", "doc-reviewer", "implementer"}
+ROLE_SKILLS = {"reviewer", "doc-reviewer", "implementer"}
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
@@ -86,6 +86,7 @@ class SkillFormatTests(unittest.TestCase):
     def test_all_skills_have_valid_frontmatter_and_body(self) -> None:
         files = skill_files()
         names = {path.parent.name for path in files}
+        self.assertNotIn("code-review", names, "legacy code-review Skill must not coexist")
         self.assertTrue(REQUIRED_SKILLS <= names, f"missing skills: {REQUIRED_SKILLS - names}")
         for path in files:
             with self.subTest(skill=path.parent.name):
